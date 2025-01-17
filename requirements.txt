@@ -1,4 +1,4 @@
 streamlit 
 google-generativeai 
-cadquery
+numpy-stl
 PyOpenGL
