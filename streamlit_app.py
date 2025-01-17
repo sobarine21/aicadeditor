@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
-import cadquery as cq
+import numpy as np
+from stl import mesh
 import re
 
 # Configure the API key securely from Streamlit's secrets
@@ -37,6 +38,43 @@ def extract_dimensions(response):
         dimensions["height"] = float(numbers[2])
     return dimensions
 
+# Function to generate an STL file for a box
+def generate_stl_box(dimensions):
+    # Create a 3D box (vertices)
+    length = dimensions["length"]
+    width = dimensions["width"]
+    height = dimensions["height"]
+
+    # Vertices of a 3D box
+    vertices = np.array([
+        [-length/2, -width/2, -height/2],
+        [ length/2, -width/2, -height/2],
+        [ length/2,  width/2, -height/2],
+        [-length/2,  width/2, -height/2],
+        [-length/2, -width/2,  height/2],
+        [ length/2, -width/2,  height/2],
+        [ length/2,  width/2,  height/2],
+        [-length/2,  width/2,  height/2]
+    ])
+
+    # Faces of the box (using vertex indices)
+    faces = np.array([
+        [0, 3, 1], [1, 3, 2], # Bottom face
+        [4, 5, 6], [4, 6, 7], # Top face
+        [0, 1, 5], [0, 5, 4], # Front face
+        [1, 2, 6], [1, 6, 5], # Right face
+        [2, 3, 7], [2, 7, 6], # Back face
+        [3, 0, 4], [3, 4, 7]  # Left face
+    ])
+
+    # Create the mesh
+    box_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            box_mesh.vectors[i][j] = vertices[face[j], :]
+
+    return box_mesh
+
 # Button to generate design based on AI's interpretation
 if st.button("Generate CAD Design"):
     if prompt:
@@ -48,12 +86,12 @@ if st.button("Generate CAD Design"):
             # Step 2: Extract the design dimensions from the AI's response
             dimensions = extract_dimensions(design_details)
 
-            # Step 3: Generate the CAD design using cadquery
-            result = cq.Workplane("XY").box(dimensions["length"], dimensions["width"], dimensions["height"])
+            # Step 3: Generate the CAD design (STL file) using numpy-stl
+            box_mesh = generate_stl_box(dimensions)
 
             # Step 4: Export the design as an STL file
             stl_file = "design.stl"
-            result.exportStl(stl_file)
+            box_mesh.save(stl_file)
 
             # Provide a download link for the STL file
             with open(stl_file, "rb") as file:
