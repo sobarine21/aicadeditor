@@ -3,7 +3,8 @@ import numpy as np
 import random
 import string
 from io import BytesIO
-from stl.mesh import Mesh  # Correct import for Mesh class from numpy-stl
+from stl import mesh
+import tempfile
 import re
 
 # NLP library for improved dimension extraction (optional)
@@ -123,10 +124,15 @@ def generate_stl_shape(dimensions, shape_type):
     elif shape_type == "custom":
         return generate_custom_shape(dimensions)
 
-# Function to generate STL file for the shape
+# Function to convert the mesh to bytes
 def stl_to_bytes(stl_mesh):
-    byte_io = BytesIO()
-    stl_mesh.save(byte_io)
+    # Create a temporary file to save the STL mesh
+    with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as temp_file:
+        stl_mesh.save(temp_file.name)  # Save to temporary file
+        
+        # Now, open the temporary file and read the binary content into BytesIO
+        with open(temp_file.name, 'rb') as f:
+            byte_io = BytesIO(f.read())
     byte_io.seek(0)
     return byte_io.getvalue()
 
@@ -171,7 +177,7 @@ def generate_stl_cylinder(dimensions):
     vertices.append([0, 0, -height / 2])  # Bottom center
 
     # Create the mesh
-    cylinder_mesh = Mesh(np.zeros(len(faces), dtype=Mesh.dtype))
+    cylinder_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
             cylinder_mesh.vectors[i][j] = vertices[face[j]]
@@ -204,7 +210,7 @@ def generate_stl_box(dimensions):
         [3, 0, 4], [3, 4, 7]
     ])
 
-    box_mesh = Mesh(np.zeros(faces.shape[0], dtype=Mesh.dtype))
+    box_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
             box_mesh.vectors[i][j] = vertices[face[j], :]
@@ -237,7 +243,7 @@ def generate_stl_sphere(dimensions):
             faces.append([p1, p2, p3])
             faces.append([p2, p4, p3])
 
-    sphere_mesh = Mesh(np.zeros(len(faces), dtype=Mesh.dtype))
+    sphere_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
             sphere_mesh.vectors[i][j] = vertices[face[j]]
