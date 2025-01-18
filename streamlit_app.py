@@ -4,7 +4,7 @@ from stl import mesh
 import re
 import random
 import string
-from io import BytesIO
+import tempfile
 
 # NLP library for improved dimension extraction (optional)
 try:
@@ -33,58 +33,7 @@ material = st.selectbox("Choose a material type:", ["Plastic", "Metal", "Wood", 
 smooth_surface = st.checkbox("Smooth Surface?", value=False)
 hollow = st.checkbox("Hollow Structure?", value=False)
 
-# Advanced Features (25 additional)
-texture = st.selectbox("Choose a texture:", ["Matte", "Glossy", "Metallic", "Transparent", "Fabric", "Wooden", "Stone", "Leather", "Grainy", "Smooth"])
-grid_resolution = st.slider("Set Grid Resolution", min_value=10, max_value=100, value=50)
-add_round_edges = st.checkbox("Add rounded edges?", value=False)
-enable_symmetry = st.checkbox("Enable symmetry?", value=False)
-wall_thickness = st.slider("Set wall thickness (for hollow objects)", min_value=1, max_value=10, value=2)
-
-# 25 new additional features
-add_stretch = st.checkbox("Apply Stretch/Deformation?", value=False)
-apply_bumps = st.checkbox("Apply Bumps/Reliefs on surface?", value=False)
-add_textures = st.checkbox("Add custom textures?", value=False)
-use_gravity = st.checkbox("Simulate gravity effects?", value=False)
-apply_noise = st.checkbox("Apply noise or random distortion?", value=False)
-add_mesh_detail = st.slider("Mesh Detail Level", min_value=1, max_value=5, value=3)
-apply_noise_type = st.selectbox("Noise Type", ["Perlin", "Gaussian", "Simplex", "White Noise", "Custom"])
-apply_material_map = st.checkbox("Apply material map?", value=False)
-add_lights = st.checkbox("Add lighting effects?", value=False)
-enable_transparency = st.checkbox("Enable transparency?", value=False)
-apply_reflection = st.checkbox("Add reflective surface?", value=False)
-simulate_refraction = st.checkbox("Simulate refraction?", value=False)
-change_orientation = st.selectbox("Shape Orientation", ["Front", "Side", "Top", "Isometric"])
-add_displacement = st.checkbox("Add displacement mapping?", value=False)
-modify_thickness = st.slider("Modify shape wall thickness", min_value=0.5, max_value=5.0, value=1.0)
-add_custom_edges = st.checkbox("Add custom edge shapes?", value=False)
-enable_decal = st.checkbox("Add decals to the surface?", value=False)
-apply_noise_intensity = st.slider("Noise Intensity", min_value=0.0, max_value=1.0, value=0.5)
-use_reflection_map = st.checkbox("Use reflection map?", value=False)
-add_cutout = st.checkbox("Add cutouts to the shape?", value=False)
-apply_shader = st.selectbox("Choose Shader", ["Phong", "Lambert", "Blinn-Phong", "Toon", "Cel", "Custom Shader"])
-apply_dissolve = st.checkbox("Apply dissolve effect?", value=False)
-add_bevel = st.checkbox("Add bevel to edges?", value=False)
-apply_glow = st.checkbox("Add glow effect?", value=False)
-add_extrusion = st.checkbox("Apply extrusion to the shape?", value=False)
-
-# Helper function for generating random string for file names
-def random_string(length=8):
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
-
-# Function to process user input with Gemini AI
-def process_user_input(user_input):
-    try:
-        # Load and configure the Gemini model
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
-
-        # Generate a response from the AI
-        response = model.generate_content(user_input)
-        return response.text
-    except Exception as e:
-        st.error(f"Error processing input: {e}")
-        return None
-
-# Function to extract dimensions from the AI's response (using NLP - optional)
+# Function to process user input (NLP or Regex extraction)
 def extract_dimensions_nlp(response):
     if nlp is None:
         return extract_dimensions_regex(response)
@@ -104,7 +53,6 @@ def extract_dimensions_nlp(response):
 
     return dimensions
 
-# Function to extract dimensions from the AI's response (fallback regex)
 def extract_dimensions_regex(response):
     dimensions = {"length": 0, "width": 0, "height": 0}
     numbers = re.findall(r'\d+', response)
@@ -121,24 +69,22 @@ def generate_stl_shape(dimensions, shape_type):
     elif shape_type == "sphere":
         return generate_stl_sphere(dimensions)
     elif shape_type == "cone":
-        return generate_stl_cone(dimensions)  # Implement cone generation
+        return generate_stl_cone(dimensions)
     elif shape_type == "pyramid":
-        return generate_stl_pyramid(dimensions)  # Implement pyramid generation
+        return generate_stl_pyramid(dimensions)
     elif shape_type == "cylinder":
-        return generate_stl_cylinder(dimensions)  # Implement cylinder generation
+        return generate_stl_cylinder(dimensions)
     elif shape_type == "torus":
-        return generate_stl_torus(dimensions)  # Implement torus generation
+        return generate_stl_torus(dimensions)
     elif shape_type == "custom":
         return generate_custom_shape(dimensions)
 
-# Function to generate a custom shape (based on AI's interpretation)
+# Function to generate a custom shape (combining predefined shapes or parts)
 def generate_custom_shape(dimensions):
     length = dimensions["length"]
     width = dimensions["width"]
     height = dimensions["height"]
 
-    # Example of a simple custom shape - a randomly created combination of predefined shapes or parts
-    # This can be extended as per the prompt description, e.g., a car, a chair, etc.
     if length > 0 and width > 0 and height > 0:
         box_mesh = generate_stl_box({"length": length, "width": width, "height": height})
         sphere_mesh = generate_stl_sphere({"length": height, "width": width, "height": height})
@@ -184,7 +130,7 @@ def generate_stl_box(dimensions):
 # Function to generate a sphere STL
 def generate_stl_sphere(dimensions):
     radius = dimensions["length"] / 2
-    num_points = grid_resolution
+    num_points = 20
 
     vertices = []
     faces = []
@@ -214,21 +160,20 @@ def generate_stl_sphere(dimensions):
 
     return sphere_mesh
 
-# Function to provide download option for STL file
+# Function to provide download option for STL file using a temporary file
 def stl_download_link(stl_mesh, filename="generated_design.stl"):
-    byte_io = BytesIO()
-    stl_mesh.save(byte_io)  # Save to BytesIO stream
-    byte_io.seek(0)  # Reset pointer to the beginning of the stream
-    st.download_button(label="Download STL", data=byte_io, file_name=filename, mime="application/vnd.ms-pki.stl")
+    with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as temp_file:
+        stl_mesh.save(temp_file.name)  # Save STL to temp file
+        st.download_button(label="Download STL", data=open(temp_file.name, 'rb'), file_name=filename, mime="application/octet-stream")
 
 # Button to generate design and download it
 if st.button("Generate Design"):
     if prompt:
-        # Process user input and generate the design
-        dimensions = extract_dimensions_nlp(prompt)  # Extract dimensions via NLP or regex
+        # Extract dimensions from user input using NLP or Regex
+        dimensions = extract_dimensions_nlp(prompt)  # Replace with actual NLP logic
         stl_mesh = generate_stl_shape(dimensions, shape_type)
         if stl_mesh:
-            stl_download_link(stl_mesh)
+            stl_download_link(stl_mesh)  # Provide the STL file for download
         else:
             st.error("Unable to generate the design with the given parameters.")
     else:
