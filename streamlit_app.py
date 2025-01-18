@@ -217,8 +217,8 @@ def generate_stl_sphere(dimensions):
 # Function to provide download option for STL file
 def stl_download_link(stl_mesh, filename="generated_design.stl"):
     byte_io = BytesIO()
-    stl_mesh.save(byte_io)
-    byte_io.seek(0)
+    stl_mesh.save(byte_io)  # Save to BytesIO stream
+    byte_io.seek(0)  # Reset pointer to the beginning of the stream
     st.download_button(label="Download STL", data=byte_io, file_name=filename, mime="application/vnd.ms-pki.stl")
 
 # Button to generate design and download it
