@@ -15,7 +15,9 @@ st.write("Use generative AI to create 3D CAD designs from your description dynam
 prompt = st.text_area(
     "Describe the design you want. Example:\n- 'Create a box with length 10mm, width 5mm, height 15mm.'\n"
     "- 'Generate a cylinder with radius 5mm and height 20mm.'\n"
-    "- 'Make a sphere with radius 10mm.'",
+    "- 'Make a sphere with radius 10mm.'\n"
+    "- 'Create a cone with radius 5mm and height 15mm.'\n"
+    "- 'Make a pyramid with base 10mm and height 15mm.'",
     height=150,
 )
 
@@ -32,21 +34,21 @@ def process_user_input(user_input):
         st.error(f"Error processing input: {e}")
         return None
 
-# Function to extract design type and parameters
+# Function to extract design type and parameters dynamically
 def parse_design_details(response):
     design_details = {
         "type": None,
         "parameters": {},
     }
 
-    # Identify shape type (box, cylinder, sphere, etc.)
+    # Identify shape type (box, cylinder, sphere, cone, pyramid, etc.)
     if "box" in response.lower():
         design_details["type"] = "box"
         matches = re.findall(r"length\s*([\d.]+)|width\s*([\d.]+)|height\s*([\d.]+)", response, re.IGNORECASE)
         if matches:
             design_details["parameters"]["length"] = float(matches[0][0] or 0)
             design_details["parameters"]["width"] = float(matches[1][1] or 0)
-            design_details["parameters"]["height"] = float(matches[2][1] or 0)
+            design_details["parameters"]["height"] = float(matches[2][2] or 0)
 
     elif "cylinder" in response.lower():
         design_details["type"] = "cylinder"
@@ -61,13 +63,27 @@ def parse_design_details(response):
         if matches:
             design_details["parameters"]["radius"] = float(matches[0][0] or 0)
 
+    elif "cone" in response.lower():
+        design_details["type"] = "cone"
+        matches = re.findall(r"radius\s*([\d.]+)|height\s*([\d.]+)", response, re.IGNORECASE)
+        if matches:
+            design_details["parameters"]["radius"] = float(matches[0][0] or 0)
+            design_details["parameters"]["height"] = float(matches[1][1] or 0)
+
+    elif "pyramid" in response.lower():
+        design_details["type"] = "pyramid"
+        matches = re.findall(r"base\s*([\d.]+)|height\s*([\d.]+)", response, re.IGNORECASE)
+        if matches:
+            design_details["parameters"]["base"] = float(matches[0][0] or 0)
+            design_details["parameters"]["height"] = float(matches[1][1] or 0)
+
     return design_details
 
 # Dynamic STL generation functions
 def generate_stl_box(params, scale):
-    length = params["length"] * scale
-    width = params["width"] * scale
-    height = params["height"] * scale
+    length = params.get("length", 0) * scale
+    width = params.get("width", 0) * scale
+    height = params.get("height", 0) * scale
 
     vertices = np.array([
         [-length / 2, -width / 2, -height / 2],
@@ -92,8 +108,8 @@ def generate_stl_box(params, scale):
     return box_mesh
 
 def generate_stl_cylinder(params, scale):
-    radius = params["radius"] * scale
-    height = params["height"] * scale
+    radius = params.get("radius", 0) * scale
+    height = params.get("height", 0) * scale
     num_sides = 32  # Resolution of the cylinder
 
     vertices = []
@@ -125,8 +141,84 @@ def generate_stl_cylinder(params, scale):
     return cylinder_mesh
 
 def generate_stl_sphere(params, scale):
-    # Add logic for sphere generation
-    pass  # Placeholder for now
+    radius = params.get("radius", 0) * scale
+    num_slices = 16  # Slices for resolution
+    num_stacks = 16  # Stacks for resolution
+    vertices = []
+    faces = []
+
+    for i in range(num_stacks + 1):
+        lat = np.pi * i / num_stacks  # Latitude
+        for j in range(num_slices):
+            lon = 2 * np.pi * j / num_slices  # Longitude
+            x = radius * np.sin(lat) * np.cos(lon)
+            y = radius * np.sin(lat) * np.sin(lon)
+            z = radius * np.cos(lat)
+            vertices.append([x, y, z])
+
+    # Create faces (triangles) for the sphere
+    for i in range(num_stacks):
+        for j in range(num_slices):
+            next_j = (j + 1) % num_slices
+            top = i * num_slices + j
+            bottom = (i + 1) * num_slices + j
+            faces.append([top, bottom, top + 1])
+            faces.append([top + 1, bottom, bottom + 1])
+
+    sphere_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            sphere_mesh.vectors[i][j] = vertices[face[j]]
+    return sphere_mesh
+
+def generate_stl_cone(params, scale):
+    radius = params.get("radius", 0) * scale
+    height = params.get("height", 0) * scale
+    num_sides = 32  # Resolution of the cone
+
+    vertices = [[0, 0, -height / 2]]  # Apex of the cone
+    for i in range(num_sides):
+        angle = 2 * np.pi * i / num_sides
+        x = radius * np.cos(angle)
+        y = radius * np.sin(angle)
+        vertices.append([x, y, height / 2])  # Bottom circle
+
+    faces = []
+    for i in range(1, num_sides + 1):
+        next_i = (i % num_sides) + 1
+        faces.append([0, i, next_i])
+
+    cone_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            cone_mesh.vectors[i][j] = vertices[face[j]]
+    return cone_mesh
+
+def generate_stl_pyramid(params, scale):
+    base = params.get("base", 0) * scale
+    height = params.get("height", 0) * scale
+    vertices = np.array([
+        [0, 0, height / 2],  # Apex
+        [-base / 2, -base / 2, -height / 2],
+        [base / 2, -base / 2, -height / 2],
+        [base / 2, base / 2, -height / 2],
+        [-base / 2, base / 2, -height / 2],
+    ])
+
+    faces = np.array([
+        [0, 1, 2],
+        [0, 2, 3],
+        [0, 3, 4],
+        [0, 4, 1],
+        [1, 2, 3],
+        [1, 3, 4]
+    ])
+
+    pyramid_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            pyramid_mesh.vectors[i][j] = vertices[face[j], :]
+    return pyramid_mesh
 
 # Main button to generate design
 if st.button("Generate CAD Design"):
@@ -148,6 +240,10 @@ if st.button("Generate CAD Design"):
                 stl_file = generate_stl_cylinder(design_details["parameters"], scale=scaling_factor)
             elif design_details["type"] == "sphere":
                 stl_file = generate_stl_sphere(design_details["parameters"], scale=scaling_factor)
+            elif design_details["type"] == "cone":
+                stl_file = generate_stl_cone(design_details["parameters"], scale=scaling_factor)
+            elif design_details["type"] == "pyramid":
+                stl_file = generate_stl_pyramid(design_details["parameters"], scale=scaling_factor)
 
             # Save and download STL
             if stl_file:
