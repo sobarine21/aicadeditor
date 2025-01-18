@@ -9,6 +9,10 @@ import string
 # Configure the API key securely from Streamlit's secrets
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
+# Helper function for generating random string for file names
+def random_string(length=8):
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
+
 # Streamlit App UI
 st.title("AI CAD Design Generator")
 st.write("Use generative AI to create CAD designs from your description.")
@@ -165,7 +169,3 @@ if st.button("Generate CAD Design"):
                 )
     else:
         st.write("Please provide a description for the design.")
-
-# Helper function for generating random string for file names
-def random_string(length=8):
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
