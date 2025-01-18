@@ -131,12 +131,60 @@ def generate_stl_shape(dimensions, shape_type):
     elif shape_type == "custom":
         return generate_custom_shape(dimensions)
 
-# Function to convert STL mesh to downloadable format
+# Function to generate STL file for the shape
 def stl_to_bytes(stl_mesh):
     byte_io = BytesIO()
     stl_mesh.save(byte_io)
     byte_io.seek(0)
     return byte_io
+
+# Function to generate a cylinder STL
+def generate_stl_cylinder(dimensions):
+    radius = dimensions["length"] / 2
+    height = dimensions["height"]
+    num_points = grid_resolution
+
+    vertices = []
+    faces = []
+
+    # Generate vertices for the cylinder
+    for i in range(num_points):
+        angle = 2 * np.pi * i / num_points
+        x = radius * np.cos(angle)
+        y = radius * np.sin(angle)
+        z_top = height / 2
+        z_bottom = -height / 2
+        vertices.append([x, y, z_top])  # Top circle
+        vertices.append([x, y, z_bottom])  # Bottom circle
+
+    # Generate faces for the cylinder
+    for i in range(num_points - 1):
+        # Sides of the cylinder
+        top1 = i * 2
+        top2 = (i + 1) * 2
+        bottom1 = top1 + 1
+        bottom2 = top2 + 1
+        faces.append([top1, bottom1, top2])
+        faces.append([top2, bottom1, bottom2])
+
+    # Cap faces for top and bottom circles
+    for i in range(num_points - 2):
+        # Top cap
+        faces.append([i * 2, ((i + 1) % num_points) * 2, num_points * 2])
+        # Bottom cap
+        faces.append([i * 2 + 1, num_points * 2 + 1, ((i + 1) % num_points) * 2 + 1])
+
+    # Add center vertices for caps
+    vertices.append([0, 0, height / 2])  # Top center
+    vertices.append([0, 0, -height / 2])  # Bottom center
+
+    # Create the mesh
+    cylinder_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            cylinder_mesh.vectors[i][j] = vertices[face[j]]
+
+    return cylinder_mesh
 
 # Function to generate a box STL
 def generate_stl_box(dimensions):
@@ -204,13 +252,20 @@ def generate_stl_sphere(dimensions):
 
     return sphere_mesh
 
-# Main functionality to display results and download
+# Main functionality to display results
 if prompt:
     dimensions = extract_dimensions_nlp(prompt)  # Extract dimensions based on the prompt
     st.write(f"Generated dimensions: {dimensions}")
     shape_mesh = generate_stl_shape(dimensions, shape_type)
     st.write(f"STL file generated for {shape_type}.")
 
-    # Convert mesh to bytes for download
-    stl_file = stl_to_bytes(shape_mesh)
-    st.download_button("Download STL", stl_file, file_name=f"{shape_type}_{random_string()}.stl", mime="application/stl")
+    # Create BytesIO stream for download
+    stl_bytes = stl_to_bytes(shape_mesh)
+
+    # Allow the user to download the STL file
+    st.download_button(
+        label="Download STL file",
+        data=stl_bytes,
+        file_name=f"{shape_type}_{random_string()}.stl",
+        mime="application/vnd.ms-pki.stl"
+    )
