@@ -221,4 +221,15 @@ def stl_download_link(stl_mesh, filename="generated_design.stl"):
     byte_io.seek(0)
     st.download_button(label="Download STL", data=byte_io, file_name=filename, mime="application/vnd.ms-pki.stl")
 
-# More shape generation functions (cone, pyramid, cylinder, etc.) need to be implemented similarly.
+# Button to generate design and download it
+if st.button("Generate Design"):
+    if prompt:
+        # Process user input and generate the design
+        dimensions = extract_dimensions_nlp(prompt)  # Extract dimensions via NLP or regex
+        stl_mesh = generate_stl_shape(dimensions, shape_type)
+        if stl_mesh:
+            stl_download_link(stl_mesh)
+        else:
+            st.error("Unable to generate the design with the given parameters.")
+    else:
+        st.error("Please enter a valid prompt.")
