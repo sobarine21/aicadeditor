@@ -130,6 +130,9 @@ if st.button("Generate CAD Design"):
             details = extract_shape_details(design_details)
             shape = details["shape"]
 
+            # Initialize stl_file to None, in case the shape is not recognized
+            stl_file = None
+
             if shape == "box":
                 # Step 3: Generate the CAD design (STL file) for a box
                 box_mesh = generate_stl_box(details)
@@ -144,16 +147,18 @@ if st.button("Generate CAD Design"):
                 sphere_mesh.save(stl_file)
 
             else:
-                st.error("Shape not recognized or supported.")
+                st.error("Shape not recognized or supported. Please provide a valid description.")
 
-            # Provide a download link for the STL file
-            with open(stl_file, "rb") as file:
-                st.download_button(
-                    label="Download STL File",
-                    data=file,
-                    file_name=stl_file,
-                    mime="application/octet-stream"
-                )
+            # Check if stl_file was defined before attempting to open it
+            if stl_file:
+                # Provide a download link for the STL file
+                with open(stl_file, "rb") as file:
+                    st.download_button(
+                        label="Download STL File",
+                        data=file,
+                        file_name=stl_file,
+                        mime="application/octet-stream"
+                    )
 
     else:
         st.write("Please provide a description for the design.")
