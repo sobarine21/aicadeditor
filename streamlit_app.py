@@ -131,23 +131,6 @@ def generate_stl_shape(dimensions, shape_type):
     elif shape_type == "custom":
         return generate_custom_shape(dimensions)
 
-# Function to generate a custom shape (based on AI's interpretation)
-def generate_custom_shape(dimensions):
-    length = dimensions["length"]
-    width = dimensions["width"]
-    height = dimensions["height"]
-
-    # Example of a simple custom shape - a randomly created combination of predefined shapes or parts
-    # This can be extended as per the prompt description, e.g., a car, a chair, etc.
-    if length > 0 and width > 0 and height > 0:
-        box_mesh = generate_stl_box({"length": length, "width": width, "height": height})
-        sphere_mesh = generate_stl_sphere({"length": height, "width": width, "height": height})
-        # Combine shapes or create new geometry based on AI's response
-        return box_mesh
-    else:
-        st.error("Unable to generate custom shape with the given dimensions.")
-        return None
-
 # Function to generate a box STL
 def generate_stl_box(dimensions):
     length = dimensions["length"]
@@ -214,4 +197,71 @@ def generate_stl_sphere(dimensions):
 
     return sphere_mesh
 
-# More shape generation functions (cone, pyramid, cylinder, etc.) need to be implemented similarly.
+# Function to simulate basic fluid dynamics (drag coefficient)
+def simulate_fluid_dynamics(shape_type, dimensions, material):
+    drag_coefficients = {
+        'sphere': 0.47,
+        'box': 1.0,
+        'cylinder': 0.82,
+    }
+    material_drag_factors = {
+        "Plastic": 1.0,
+        "Metal": 0.9,
+        "Wood": 1.1,
+        "Glass": 0.8,
+        "Rubber": 1.2,
+        "Concrete": 1.3,
+        "Carbon Fiber": 0.7,
+        "Aluminum": 0.85,
+        "Copper": 0.95,
+        "Stone": 1.4
+    }
+
+    drag_coefficient = drag_coefficients.get(shape_type, 1.0)
+    material_factor = material_drag_factors.get(material, 1.0)
+    fluid_flow_behavior = "Smooth" if drag_coefficient < 1.0 else "Turbulent"
+    drag_coefficient *= material_factor
+
+    return drag_coefficient, fluid_flow_behavior
+
+# Function to simulate basic stress testing (simplified)
+def simulate_stress_test(shape_type, dimensions, material):
+    material_strength = {
+        "Plastic": 50,
+        "Metal": 200,
+        "Wood": 30,
+        "Glass": 150,
+        "Rubber": 10,
+        "Concrete": 30,
+        "Carbon Fiber": 1000,
+        "Aluminum": 250,
+        "Copper": 210,
+        "Stone": 80
+    }
+
+    volume = dimensions["length"] * dimensions["width"] * dimensions["height"]
+    material_strength_factor = material_strength.get(material, 50)
+    stress = volume / material_strength_factor
+    stress_level = "Low" if stress < 10 else "Medium" if stress < 50 else "High"
+
+    return stress, stress_level
+
+# Add fluid dynamics and stress tests to the app
+def display_simulation_results(shape_type, dimensions, material):
+    drag_coefficient, fluid_flow_behavior = simulate_fluid_dynamics(shape_type, dimensions, material)
+    st.write(f"**Drag Coefficient**: {drag_coefficient:.2f}")
+    st.write(f"**Fluid Flow Behavior**: {fluid_flow_behavior}")
+
+    stress, stress_level = simulate_stress_test(shape_type, dimensions, material)
+    st.write(f"**Stress Resistance**: {stress:.2f} MPa")
+    st.write(f"**Stress Level**: {stress_level}")
+
+# Main functionality to display results
+if prompt:
+    dimensions = extract_dimensions_nlp(prompt)  # Extract dimensions based on the prompt
+    st.write(f"Generated dimensions: {dimensions}")
+    shape_mesh = generate_stl_shape(dimensions, shape_type)
+    st.write(f"STL file generated for {shape_type}.")
+
+    # Display fluid dynamics and stress test results
+    display_simulation_results(shape_type, dimensions, material)
