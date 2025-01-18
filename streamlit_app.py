@@ -17,9 +17,11 @@ prompt = st.text_area("Enter your 3D model description (e.g., 'create a toy car 
 # Function to generate 3D model from text description using Google Gemini
 def generate_3d_model(prompt):
     try:
-        # Using Gemini to interpret the prompt and return model parameters
+        # Modify the prompt to ensure the AI generates a consistent, structured response
+        refined_prompt = f"Generate a 3D model description with parameters in the format: length: x, width: y, height: z, wheel_radius: w. The description should be based on the following: {prompt}"
+
         model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
+        response = model.generate_content(refined_prompt)
         model_description = response.text
         st.write("AI Response:", model_description)
         return model_description
@@ -27,20 +29,32 @@ def generate_3d_model(prompt):
         st.error(f"Error generating model: {e}")
         return None
 
-# Function to extract parameters from description
+# Function to extract parameters from the description
 def extract_parameters(description):
-    # Extract dimensions and parts for the toy car (body, wheels, etc.)
-    car_dimensions = re.findall(r'length\s?(\d+\.?\d*)\s?mm.*?width\s?(\d+\.?\d*)\s?mm.*?height\s?(\d+\.?\d*)\s?mm', description)
-    wheel_size = re.findall(r'wheel\s?radius\s?(\d+\.?\d*)\s?mm', description)
-
-    # If dimensions found, return them
-    if car_dimensions:
-        length, width, height = map(float, car_dimensions[0])
-        wheel_radius = float(wheel_size[0]) if wheel_size else 2
-        return {"shape": "toy_car", "body_dimensions": [length, width, height], "wheel_radius": wheel_radius}
+    # Default to an empty dictionary
+    params = {
+        "shape": "toy_car",
+        "body_dimensions": [10, 5, 15],
+        "wheel_radius": 2
+    }
     
-    # Default toy car if no valid input is found
-    return {"shape": "toy_car", "body_dimensions": [10, 5, 15], "wheel_radius": 2}
+    # Try to extract dimensions with regex patterns
+    length_match = re.search(r'length\s?(\d+\.?\d*)\s?mm', description)
+    width_match = re.search(r'width\s?(\d+\.?\d*)\s?mm', description)
+    height_match = re.search(r'height\s?(\d+\.?\d*)\s?mm', description)
+    wheel_match = re.search(r'wheel\s?radius\s?(\d+\.?\d*)\s?mm', description)
+
+    if length_match and width_match and height_match:
+        params["body_dimensions"] = [
+            float(length_match.group(1)),
+            float(width_match.group(1)),
+            float(height_match.group(1))
+        ]
+    
+    if wheel_match:
+        params["wheel_radius"] = float(wheel_match.group(1))
+    
+    return params
 
 # Function to create a 3D model of the toy car using Trimesh
 def create_3d_model_from_description(description):
@@ -74,8 +88,8 @@ def visualize_3d_model(model):
     fig = go.Figure(data=[go.Mesh3d(
         x=vertices[:, 0], y=vertices[:, 1], z=vertices[:, 2],
         i=faces[:, 0], j=faces[:, 1], k=faces[:, 2],
-        opacity=0.5,
-        color='blue'
+        opacity=0.8,
+        color='lightblue'
     )])
     fig.update_layout(
         title="Generated 3D Model",
@@ -90,16 +104,18 @@ def visualize_3d_model(model):
 # Button to generate 3D model
 if st.button("Generate 3D Model"):
     if prompt:
-        # Generate the model description via Gemini
         model_description = generate_3d_model(prompt)
         
-        # If a description is generated, proceed to create the 3D model
         if model_description:
-            # Generate 3D model from description
-            model = create_3d_model_from_description(model_description)
+            params = extract_parameters(model_description)
+            if not params.get("body_dimensions"):
+                st.error("Could not extract valid dimensions from the AI model description.")
+            else:
+                model = create_3d_model_from_description(model_description)
 
-            # Visualize the 3D model using Plotly
-            if model:
-                visualize_3d_model(model)
+                if model:
+                    visualize_3d_model(model)
+        else:
+            st.error("AI failed to generate a valid model description.")
     else:
         st.error("Please enter a description for the 3D model.")
