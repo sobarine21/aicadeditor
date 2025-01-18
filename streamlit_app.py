@@ -12,7 +12,7 @@ st.title("AI-Powered CAD Co-Pilot for Hardware Design")
 st.write("Transform your plain text descriptions into parametric 3D models.")
 
 # User input for CAD model description
-prompt = st.text_area("Enter your 3D model description (e.g., 'create a toy car with length 10mm, width 5mm, height 15mm'):")
+prompt = st.text_area("Enter your 3D model description (e.g., 'create a toy car with length 10mm, width 5mm, and height 15mm'):")
 
 # Function to generate 3D model from text description using Google Gemini
 def generate_3d_model(prompt):
@@ -36,7 +36,8 @@ def extract_parameters(description):
     # If dimensions found, return them
     if car_dimensions:
         length, width, height = map(float, car_dimensions[0])
-        return {"shape": "toy_car", "body_dimensions": [length, width, height], "wheel_radius": float(wheel_size[0]) if wheel_size else 2}
+        wheel_radius = float(wheel_size[0]) if wheel_size else 2
+        return {"shape": "toy_car", "body_dimensions": [length, width, height], "wheel_radius": wheel_radius}
     
     # Default toy car if no valid input is found
     return {"shape": "toy_car", "body_dimensions": [10, 5, 15], "wheel_radius": 2}
