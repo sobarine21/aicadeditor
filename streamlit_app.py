@@ -9,10 +9,6 @@ import string
 # Configure the API key securely from Streamlit's secrets
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-# Helper function for generating random string for file names
-def random_string(length=8):
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
-
 # Streamlit App UI
 st.title("AI CAD Design Generator")
 st.write("Use generative AI to create CAD designs from your description.")
@@ -31,6 +27,10 @@ color = st.color_picker("Pick a color for the design:", "#FF5733")
 material = st.selectbox("Choose a material type:", ["Plastic", "Metal", "Wood", "Glass", "Rubber"])
 smooth_surface = st.checkbox("Smooth Surface?", value=False)
 hollow = st.checkbox("Hollow Structure?", value=False)
+
+# Helper function for generating random string for file names
+def random_string(length=8):
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 # Function to process user input with Gemini AI
 def process_user_input(user_input):
