@@ -2,4 +2,4 @@ streamlit
 google-generativeai 
 numpy-stl
 PyOpenGL
-freecad
+
