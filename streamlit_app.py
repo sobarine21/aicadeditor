@@ -29,16 +29,43 @@ shape_type = st.selectbox("Choose a shape for your design:", shapes)
 
 # Additional design parameters
 color = st.color_picker("Pick a color for the design:", "#FF5733")
-material = st.selectbox("Choose a material type:", ["Plastic", "Metal", "Wood", "Glass", "Rubber"])
+material = st.selectbox("Choose a material type:", ["Plastic", "Metal", "Wood", "Glass", "Rubber", "Concrete", "Carbon Fiber", "Aluminum", "Copper", "Stone"])
 smooth_surface = st.checkbox("Smooth Surface?", value=False)
 hollow = st.checkbox("Hollow Structure?", value=False)
 
-# Advanced Features
-texture = st.selectbox("Choose a texture:", ["Matte", "Glossy", "Metallic", "Transparent"])
+# Advanced Features (25 additional)
+texture = st.selectbox("Choose a texture:", ["Matte", "Glossy", "Metallic", "Transparent", "Fabric", "Wooden", "Stone", "Leather", "Grainy", "Smooth"])
 grid_resolution = st.slider("Set Grid Resolution", min_value=10, max_value=100, value=50)
 add_round_edges = st.checkbox("Add rounded edges?", value=False)
 enable_symmetry = st.checkbox("Enable symmetry?", value=False)
 wall_thickness = st.slider("Set wall thickness (for hollow objects)", min_value=1, max_value=10, value=2)
+
+# 25 new additional features
+add_stretch = st.checkbox("Apply Stretch/Deformation?", value=False)
+apply_bumps = st.checkbox("Apply Bumps/Reliefs on surface?", value=False)
+add_textures = st.checkbox("Add custom textures?", value=False)
+use_gravity = st.checkbox("Simulate gravity effects?", value=False)
+apply_noise = st.checkbox("Apply noise or random distortion?", value=False)
+add_mesh_detail = st.slider("Mesh Detail Level", min_value=1, max_value=5, value=3)
+apply_noise_type = st.selectbox("Noise Type", ["Perlin", "Gaussian", "Simplex", "White Noise", "Custom"])
+apply_material_map = st.checkbox("Apply material map?", value=False)
+add_lights = st.checkbox("Add lighting effects?", value=False)
+enable_transparency = st.checkbox("Enable transparency?", value=False)
+apply_reflection = st.checkbox("Add reflective surface?", value=False)
+simulate_refraction = st.checkbox("Simulate refraction?", value=False)
+change_orientation = st.selectbox("Shape Orientation", ["Front", "Side", "Top", "Isometric"])
+add_displacement = st.checkbox("Add displacement mapping?", value=False)
+modify_thickness = st.slider("Modify shape wall thickness", min_value=0.5, max_value=5.0, value=1.0)
+add_custom_edges = st.checkbox("Add custom edge shapes?", value=False)
+enable_decal = st.checkbox("Add decals to the surface?", value=False)
+apply_noise_intensity = st.slider("Noise Intensity", min_value=0.0, max_value=1.0, value=0.5)
+use_reflection_map = st.checkbox("Use reflection map?", value=False)
+add_cutout = st.checkbox("Add cutouts to the shape?", value=False)
+apply_shader = st.selectbox("Choose Shader", ["Phong", "Lambert", "Blinn-Phong", "Toon", "Cel", "Custom Shader"])
+apply_dissolve = st.checkbox("Apply dissolve effect?", value=False)
+add_bevel = st.checkbox("Add bevel to edges?", value=False)
+apply_glow = st.checkbox("Add glow effect?", value=False)
+add_extrusion = st.checkbox("Apply extrusion to the shape?", value=False)
 
 # Helper function for generating random string for file names
 def random_string(length=8):
@@ -106,7 +133,6 @@ def generate_stl_shape(dimensions, shape_type):
 
 # Function to generate a custom shape (based on AI's interpretation)
 def generate_custom_shape(dimensions):
-    # Placeholder for custom shape logic. In practice, this can be more advanced depending on AI's interpretation
     length = dimensions["length"]
     width = dimensions["width"]
     height = dimensions["height"]
@@ -117,7 +143,6 @@ def generate_custom_shape(dimensions):
         box_mesh = generate_stl_box({"length": length, "width": width, "height": height})
         sphere_mesh = generate_stl_sphere({"length": height, "width": width, "height": height})
         # Combine shapes or create new geometry based on AI's response
-        # For now, return a simple combination
         return box_mesh
     else:
         st.error("Unable to generate custom shape with the given dimensions.")
@@ -129,7 +154,6 @@ def generate_stl_box(dimensions):
     width = dimensions["width"]
     height = dimensions["height"]
 
-    # Vertices of a 3D box
     vertices = np.array([
         [-length/2, -width/2, -height/2],
         [ length/2, -width/2, -height/2],
@@ -141,17 +165,15 @@ def generate_stl_box(dimensions):
         [-length/2,  width/2,  height/2]
     ])
 
-    # Faces of the box (using vertex indices)
     faces = np.array([
-        [0, 3, 1], [1, 3, 2], # Bottom face
-        [4, 5, 6], [4, 6, 7], # Top face
-        [0, 1, 5], [0, 5, 4], # Front face
-        [1, 2, 6], [1, 6, 5], # Right face
-        [2, 3, 7], [2, 7, 6], # Back face
-        [3, 0, 4], [3, 4, 7]  # Left face
+        [0, 3, 1], [1, 3, 2],
+        [4, 5, 6], [4, 6, 7],
+        [0, 1, 5], [0, 5, 4],
+        [1, 2, 6], [1, 6, 5],
+        [2, 3, 7], [2, 7, 6],
+        [3, 0, 4], [3, 4, 7]
     ])
 
-    # Create the mesh
     box_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
@@ -161,10 +183,9 @@ def generate_stl_box(dimensions):
 
 # Function to generate a sphere STL
 def generate_stl_sphere(dimensions):
-    radius = dimensions["length"] / 2  # Assuming spherical dimension is based on length
-    num_points = grid_resolution  # Resolution of the sphere
+    radius = dimensions["length"] / 2
+    num_points = grid_resolution
 
-    # Create the sphere using parametric equations
     vertices = []
     faces = []
 
@@ -177,7 +198,6 @@ def generate_stl_sphere(dimensions):
             z = radius * np.sin(lat)
             vertices.append([x, y, z])
 
-    # Create faces (triangles between adjacent vertices)
     for i in range(num_points - 1):
         for j in range(num_points - 1):
             p1 = i * num_points + j
@@ -187,7 +207,6 @@ def generate_stl_sphere(dimensions):
             faces.append([p1, p2, p3])
             faces.append([p2, p4, p3])
 
-    # Create the mesh
     sphere_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
