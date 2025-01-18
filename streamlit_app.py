@@ -1,270 +1,117 @@
 import streamlit as st
+import google.generativeai as genai
+import os
 import numpy as np
-import random
-import string
-from io import BytesIO
-from stl import mesh
-import tempfile
-import re
+import math
 
-# NLP library for improved dimension extraction (optional)
-try:
-    import spacy
-    nlp = spacy.load("en_core_web_sm")
-except ImportError:
-    st.warning("spaCy library not found. Using simpler dimension extraction.")
-    nlp = None
+# Configure the Gemini API key securely from Streamlit's secrets
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+
+# Function to estimate cutting force (simplified model based on cutting speed, tool diameter, and material)
+def calculate_cutting_force(diameter, cutting_speed, feed_rate, material):
+    material_properties = {
+        "Aluminum": 100,  # N/mm^2
+        "Steel": 200,
+        "Titanium": 300,
+        "Brass": 150,
+        "Plastic": 50,
+        "Other": 120
+    }
+    
+    material_strength = material_properties.get(material, 120)  # Default to "Other" if not found
+    force = (cutting_speed * feed_rate * diameter) / 1000  # Simplified formula for estimation
+    
+    # Adjust based on material strength
+    force *= material_strength / 100
+    return force
+
+# Function to estimate tool life based on cutting force and tool diameter
+def estimate_tool_life(cutting_force, tool_diameter):
+    # A simplified formula for tool life estimation
+    tool_life = (tool_diameter ** 2) / (cutting_force * 0.1)
+    return tool_life
 
 # Streamlit App UI
-st.title("AI CAD Design Generator")
-st.write("Use generative AI to create CAD designs from your description.")
+st.title("CNC VMC Design Copilot")
+st.write("Use Generative AI to design CNC VMC models and generate G-code files with enhanced features.")
 
-# Prompt input field
-prompt = st.text_area("Describe the design you want (e.g., 'Create a box with length 10mm, width 5mm, and height 15mm.')")
+# Part Specifications
+st.header("Part Specifications")
+shape = st.selectbox("Select Part Shape:", ["Cylinder", "Cube", "Cone", "Sphere"])
+diameter = st.number_input("Enter diameter (mm):", min_value=1, value=50)
+height = st.number_input("Enter height (mm):", min_value=1, value=100)
+length = st.number_input("Enter length (mm):", min_value=1, value=100) if shape == "Cube" else 0
 
-# Define available shapes
-shapes = ['box', 'sphere', 'cone', 'pyramid', 'cylinder', 'torus', 'custom']
+material = st.selectbox("Select material:", ["Aluminum", "Steel", "Titanium", "Brass", "Plastic", "Other"])
 
-# Dropdown for shape selection
-shape_type = st.selectbox("Choose a shape for your design:", shapes)
+# Tolerance and Finish
+tolerance = st.number_input("Enter tolerance (mm):", min_value=0.01, value=0.1)
+finish_type = st.selectbox("Select finish type:", ["Rough", "Fine", "Ultra-Fine"])
 
-# Additional design parameters
-color = st.color_picker("Pick a color for the design:", "#FF5733")
-material = st.selectbox("Choose a material type:", ["Plastic", "Metal", "Wood", "Glass", "Rubber", "Concrete", "Carbon Fiber", "Aluminum", "Copper", "Stone"])
-smooth_surface = st.checkbox("Smooth Surface?", value=False)
-hollow = st.checkbox("Hollow Structure?", value=False)
+# Tooling Information
+st.header("Tooling Information")
+tool_type = st.selectbox("Select tool type:", ["End Mill", "Ball End Mill", "Face Mill", "Drill", "Tap"])
+tool_diameter = st.number_input("Enter tool diameter (mm):", min_value=1, value=10)
+tool_length = st.number_input("Enter tool length (mm):", min_value=1, value=50)
+cutting_speed = st.number_input("Enter cutting speed (mm/min):", min_value=1, value=150)
+feed_rate = st.number_input("Enter feed rate (mm/min):", min_value=1, value=100)
+depth_of_cut = st.number_input("Enter depth of cut (mm):", min_value=0.1, value=5.0)
 
-# Advanced Features (25 additional)
-texture = st.selectbox("Choose a texture:", ["Matte", "Glossy", "Metallic", "Transparent", "Fabric", "Wooden", "Stone", "Leather", "Grainy", "Smooth"])
-grid_resolution = st.slider("Set Grid Resolution", min_value=10, max_value=100, value=50)
-add_round_edges = st.checkbox("Add rounded edges?", value=False)
-enable_symmetry = st.checkbox("Enable symmetry?", value=False)
-wall_thickness = st.slider("Set wall thickness (for hollow objects)", min_value=1, max_value=10, value=2)
+# Advanced Machining Options
+workpiece_orientation = st.selectbox("Select workpiece orientation:", ["Flat", "Vertical", "Tilted"])
+coolant_option = st.radio("Use coolant?", ("Yes", "No"))
+spindle_speed = st.number_input("Enter spindle speed (RPM):", min_value=500, value=1500)
+chip_load = st.number_input("Enter chip load (mm/tooth):", min_value=0.01, value=0.1)
 
-# 25 new additional features
-add_stretch = st.checkbox("Apply Stretch/Deformation?", value=False)
-apply_bumps = st.checkbox("Apply Bumps/Reliefs on surface?", value=False)
-add_textures = st.checkbox("Add custom textures?", value=False)
-use_gravity = st.checkbox("Simulate gravity effects?", value=False)
-apply_noise = st.checkbox("Apply noise or random distortion?", value=False)
-add_mesh_detail = st.slider("Mesh Detail Level", min_value=1, max_value=5, value=3)
-apply_noise_type = st.selectbox("Noise Type", ["Perlin", "Gaussian", "Simplex", "White Noise", "Custom"])
-apply_material_map = st.checkbox("Apply material map?", value=False)
-add_lights = st.checkbox("Add lighting effects?", value=False)
-enable_transparency = st.checkbox("Enable transparency?", value=False)
-apply_reflection = st.checkbox("Add reflective surface?", value=False)
-simulate_refraction = st.checkbox("Simulate refraction?", value=False)
-change_orientation = st.selectbox("Shape Orientation", ["Front", "Side", "Top", "Isometric"])
-add_displacement = st.checkbox("Add displacement mapping?", value=False)
-modify_thickness = st.slider("Modify shape wall thickness", min_value=0.5, max_value=5.0, value=1.0)
-add_custom_edges = st.checkbox("Add custom edge shapes?", value=False)
-enable_decal = st.checkbox("Add decals to the surface?", value=False)
-apply_noise_intensity = st.slider("Noise Intensity", min_value=0.0, max_value=1.0, value=0.5)
-use_reflection_map = st.checkbox("Use reflection map?", value=False)
-add_cutout = st.checkbox("Add cutouts to the shape?", value=False)
-apply_shader = st.selectbox("Choose Shader", ["Phong", "Lambert", "Blinn-Phong", "Toon", "Cel", "Custom Shader"])
-apply_dissolve = st.checkbox("Apply dissolve effect?", value=False)
-add_bevel = st.checkbox("Add bevel to edges?", value=False)
-apply_glow = st.checkbox("Add glow effect?", value=False)
-add_extrusion = st.checkbox("Apply extrusion to the shape?", value=False)
+# Operations and Sequence
+st.header("Operations Sequence")
+operations = st.multiselect("Select operations:", ["Roughing", "Drilling", "Finishing", "Tapping"])
+operation_sequence = st.text_input("Define operation sequence (comma-separated, e.g., Roughing, Drilling):")
 
-# Helper function for generating random string for file names
-def random_string(length=8):
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
-
-# Function to process user input with Gemini AI (placeholder for AI functionality)
-def process_user_input(user_input):
-    # In a real application, you'd integrate a model like Gemini to process the input
-    return user_input
-
-# Function to extract dimensions from the AI's response (using NLP - optional)
-def extract_dimensions_nlp(response):
-    if nlp is None:
-        return extract_dimensions_regex(response)
-
-    doc = nlp(response)
-
-    dimensions = {"length": 0, "width": 0, "height": 0}
-    for token in doc:
-        if token.pos_ == "NUM":
-            value = float(token.text)
-            if "length" in token.text.lower():
-                dimensions["length"] = value
-            elif "width" in token.text.lower():
-                dimensions["width"] = value
-            elif "height" in token.text.lower():
-                dimensions["height"] = value
-
-    return dimensions
-
-# Function to extract dimensions from the AI's response (fallback regex)
-def extract_dimensions_regex(response):
-    dimensions = {"length": 0, "width": 0, "height": 0}
-    numbers = re.findall(r'\d+', response)
-    if len(numbers) >= 3:
-        dimensions["length"] = float(numbers[0])
-        dimensions["width"] = float(numbers[1])
-        dimensions["height"] = float(numbers[2])
-    return dimensions
-
-# Function to generate an STL file for different shapes
-def generate_stl_shape(dimensions, shape_type):
-    if shape_type == "box":
-        return generate_stl_box(dimensions)
-    elif shape_type == "sphere":
-        return generate_stl_sphere(dimensions)
-    elif shape_type == "cone":
-        return generate_stl_cone(dimensions)  # Implement cone generation
-    elif shape_type == "pyramid":
-        return generate_stl_pyramid(dimensions)  # Implement pyramid generation
-    elif shape_type == "cylinder":
-        return generate_stl_cylinder(dimensions)  # Implement cylinder generation
-    elif shape_type == "torus":
-        return generate_stl_torus(dimensions)  # Implement torus generation
-    elif shape_type == "custom":
-        return generate_custom_shape(dimensions)
-
-# Function to convert the mesh to bytes
-def stl_to_bytes(stl_mesh):
-    # Create a temporary file to save the STL mesh
-    with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as temp_file:
-        stl_mesh.save(temp_file.name)  # Save to temporary file
+# Button to generate model and G-code
+if st.button("Generate Design and G-code"):
+    try:
+        # Step 1: Generate CNC Model using Gemini API
+        prompt = f"Create a 3D {shape} CNC VMC model with diameter {diameter}mm, height {height}mm, material {material}, using tool {tool_type}, with cutting speed {cutting_speed}mm/min, feed rate {feed_rate}mm/min, depth of cut {depth_of_cut}mm. Apply {finish_type} finish."
         
-        # Now, open the temporary file and read the binary content into BytesIO
-        with open(temp_file.name, 'rb') as f:
-            byte_io = BytesIO(f.read())
-    byte_io.seek(0)
-    return byte_io.getvalue()
+        # Interact with Gemini API for design generation (simulate with a mock response)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
 
-# Function to generate a cylinder STL
-def generate_stl_cylinder(dimensions):
-    radius = dimensions["length"] / 2
-    height = dimensions["height"]
-    num_points = grid_resolution
+        # Simulate Toolpath Generation
+        toolpath = f"Generating toolpath for {material} part with {tool_type}."
 
-    vertices = []
-    faces = []
+        # Advanced Cutting Force Estimation
+        cutting_force = calculate_cutting_force(diameter, cutting_speed, feed_rate, material)
+        tool_life = estimate_tool_life(cutting_force, tool_diameter)
 
-    # Generate vertices for the cylinder
-    for i in range(num_points):
-        angle = 2 * np.pi * i / num_points
-        x = radius * np.cos(angle)
-        y = radius * np.sin(angle)
-        z_top = height / 2
-        z_bottom = -height / 2
-        vertices.append([x, y, z_top])  # Top circle
-        vertices.append([x, y, z_bottom])  # Bottom circle
+        # Step 3: Generate G-code (simplified)
+        gcode = f"""
+        G21 ; Set units to mm
+        G17 ; Select XY plane
+        G90 ; Absolute positioning
+        ; Toolpath for {material} part with {tool_type}
+        {toolpath}
+        M30 ; End of program
+        """
+        
+        # Step 4: Handle file generation for CAD (mocked content)
+        gcode_filename = f"part_{diameter}x{height}_gcode.gcode"
+        with open(gcode_filename, 'w') as file:
+            file.write(gcode)
 
-    # Generate faces for the cylinder
-    for i in range(num_points - 1):
-        # Sides of the cylinder
-        top1 = i * 2
-        top2 = (i + 1) * 2
-        bottom1 = top1 + 1
-        bottom2 = top2 + 1
-        faces.append([top1, bottom1, top2])
-        faces.append([top2, bottom1, bottom2])
+        cad_filename = f"part_{diameter}x{height}_model.step"
+        with open(cad_filename, 'w') as file:
+            file.write(f"CAD file for {material} part with diameter {diameter}mm and height {height}mm.")
 
-    # Cap faces for top and bottom circles
-    for i in range(num_points - 2):
-        # Top cap
-        faces.append([i * 2, ((i + 1) % num_points) * 2, num_points * 2])
-        # Bottom cap
-        faces.append([i * 2 + 1, num_points * 2 + 1, ((i + 1) % num_points) * 2 + 1])
+        # Step 5: Provide download links
+        st.write("Design Generation and Toolpath Complete!")
+        st.download_button(label="Download G-code", data=open(gcode_filename, "rb").read(), file_name=gcode_filename, mime="application/gcode")
+        st.download_button(label="Download CAD Model (STEP format)", data=open(cad_filename, "rb").read(), file_name=cad_filename, mime="application/step")
 
-    # Add center vertices for caps
-    vertices.append([0, 0, height / 2])  # Top center
-    vertices.append([0, 0, -height / 2])  # Bottom center
+        # Display advanced features
+        st.write(f"Estimated Cutting Force: {cutting_force:.2f} N")
+        st.write(f"Tool Life Estimation: {tool_life:.2f} hours based on parameters.")
 
-    # Create the mesh
-    cylinder_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            cylinder_mesh.vectors[i][j] = vertices[face[j]]
-
-    return cylinder_mesh
-
-# Function to generate a box STL
-def generate_stl_box(dimensions):
-    length = dimensions["length"]
-    width = dimensions["width"]
-    height = dimensions["height"]
-
-    vertices = np.array([
-        [-length/2, -width/2, -height/2],
-        [ length/2, -width/2, -height/2],
-        [ length/2,  width/2, -height/2],
-        [-length/2,  width/2, -height/2],
-        [-length/2, -width/2,  height/2],
-        [ length/2, -width/2,  height/2],
-        [ length/2,  width/2,  height/2],
-        [-length/2,  width/2,  height/2]
-    ])
-
-    faces = np.array([
-        [0, 3, 1], [1, 3, 2],
-        [4, 5, 6], [4, 6, 7],
-        [0, 1, 5], [0, 5, 4],
-        [1, 2, 6], [1, 6, 5],
-        [2, 3, 7], [2, 7, 6],
-        [3, 0, 4], [3, 4, 7]
-    ])
-
-    box_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            box_mesh.vectors[i][j] = vertices[face[j], :]
-
-    return box_mesh
-
-# Function to generate a sphere STL
-def generate_stl_sphere(dimensions):
-    radius = dimensions["length"] / 2
-    num_points = grid_resolution
-
-    vertices = []
-    faces = []
-
-    for i in range(num_points):
-        lat = np.pi * (i / (num_points - 1) - 0.5)
-        for j in range(num_points):
-            lon = 2 * np.pi * j / (num_points - 1)
-            x = radius * np.cos(lat) * np.cos(lon)
-            y = radius * np.cos(lat) * np.sin(lon)
-            z = radius * np.sin(lat)
-            vertices.append([x, y, z])
-
-    for i in range(num_points - 1):
-        for j in range(num_points - 1):
-            p1 = i * num_points + j
-            p2 = p1 + 1
-            p3 = p1 + num_points
-            p4 = p3 + 1
-            faces.append([p1, p2, p3])
-            faces.append([p2, p4, p3])
-
-    sphere_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            sphere_mesh.vectors[i][j] = vertices[face[j]]
-
-    return sphere_mesh
-
-# Button to generate STL and download
-if st.button("Generate STL"):
-    response = process_user_input(prompt)
-    dimensions = extract_dimensions_nlp(response)
-    
-    # Generate the STL mesh
-    stl_mesh = generate_stl_shape(dimensions, shape_type)
-    
-    # Convert mesh to bytes
-    stl_bytes = stl_to_bytes(stl_mesh)
-
-    # Provide download link
-    st.download_button(
-        label="Download STL File",
-        data=stl_bytes,
-        file_name=f"{random_string()}.stl",
-        mime="application/stl"
-    )
+    except Exception as e:
+        st.error(f"Error: {e}")
