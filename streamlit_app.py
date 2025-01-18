@@ -1,21 +1,13 @@
 import streamlit as st
+import google.generativeai as genai
 import numpy as np
-from stl import mesh
+import FreeCAD, Part
 import re
 import random
 import string
-from io import BytesIO
 
-# NLP library for improved dimension extraction (optional)
-try:
-    import spacy
-    nlp = spacy.load("en_core_web_sm")
-except ImportError:
-    st.warning("spaCy library not found. Using simpler dimension extraction.")
-    nlp = None
-
-# Configure Streamlit secrets (replace with your actual API key)
-st.secrets["GOOGLE_API_KEY"] = "YOUR_API_KEY"
+# Configure the API key securely from Streamlit's secrets
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
 # Streamlit App UI
 st.title("AI CAD Design Generator")
@@ -52,7 +44,7 @@ def process_user_input(user_input):
     try:
         # Load and configure the Gemini model
         model = genai.GenerativeModel("gemini-2.0-flash-exp")
-
+        
         # Generate a response from the AI
         response = model.generate_content(user_input)
         return response.text
@@ -60,29 +52,10 @@ def process_user_input(user_input):
         st.error(f"Error processing input: {e}")
         return None
 
-# Function to extract dimensions from the AI's response (using NLP - optional)
-def extract_dimensions_nlp(response):
-    if nlp is None:
-        return extract_dimensions_regex(response)
-
-    doc = nlp(response)
-
+# Function to extract dimensions from the AI's response
+def extract_dimensions(response):
     dimensions = {"length": 0, "width": 0, "height": 0}
-    for token in doc:
-        if token.pos_ == "NUM":
-            value = float(token.text)
-            if "length" in token.text.lower():
-                dimensions["length"] = value
-            elif "width" in token.text.lower():
-                dimensions["width"] = value
-            elif "height" in token.text.lower():
-                dimensions["height"] = value
-
-    return dimensions
-
-# Function to extract dimensions from the AI's response (fallback regex)
-def extract_dimensions_regex(response):
-    dimensions = {"length": 0, "width": 0, "height": 0}
+    # Regex to extract numerical dimensions (assuming a format like: length x width x height)
     numbers = re.findall(r'\d+', response)
     if len(numbers) >= 3:
         dimensions["length"] = float(numbers[0])
@@ -90,97 +63,86 @@ def extract_dimensions_regex(response):
         dimensions["height"] = float(numbers[2])
     return dimensions
 
-# Function to generate an STL file for different shapes
-def generate_stl_shape(dimensions, shape_type):
+# Function to generate a FreeCAD document for different shapes
+def generate_freecad_shape(dimensions, shape_type):
+    doc = FreeCAD.newDocument("ShapeDesign")
     if shape_type == "box":
-        return generate_stl_box(dimensions)
+        return generate_freecad_box(doc, dimensions)
     elif shape_type == "sphere":
-        return generate_stl_sphere(dimensions)
+        return generate_freecad_sphere(doc, dimensions)
     elif shape_type == "cone":
-        return generate_stl_cone(dimensions)  # Implement cone generation
+        return generate_freecad_cone(doc, dimensions)
     elif shape_type == "pyramid":
-        return generate_stl_pyramid(dimensions)  # Implement pyramid generation
+        return generate_freecad_pyramid(doc, dimensions)
     elif shape_type == "cylinder":
-        return generate_stl_cylinder(dimensions)  # Implement cylinder generation
+        return generate_freecad_cylinder(doc, dimensions)
     elif shape_type == "torus":
-        return generate_stl_torus(dimensions)  # Implement torus generation
+        return generate_freecad_torus(doc, dimensions)
     elif shape_type == "custom":
-        return generate_custom_shape(dimensions)
+        return generate_custom_shape(doc, dimensions)
 
 # Function to generate a custom shape (based on AI's interpretation)
-def generate_custom_shape(dimensions):
+def generate_custom_shape(doc, dimensions):
     # Placeholder for custom shape logic. In practice, this can be more advanced depending on AI's interpretation
     length = dimensions["length"]
     width = dimensions["width"]
     height = dimensions["height"]
-
+    
     # Example of a simple custom shape - a randomly created combination of predefined shapes or parts
-    # This can be extended as per the prompt description, e.g., a car, a chair, etc.
     if length > 0 and width > 0 and height > 0:
-        box_mesh = generate_stl_box({"length": length, "width": width, "height": height})
-        sphere_mesh = generate_stl_sphere({"length": height, "width": width, "height": height})
-        # Combine shapes or create new geometry based on AI's response
-        # For now, return a simple combination
-        return box_mesh
+        box = generate_freecad_box(doc, {"length": length, "width": width, "height": height})
+        sphere = generate_freecad_sphere(doc, {"length": height, "width": width, "height": height})
+        return box # For simplicity, returning box as a placeholder for a "custom" shape
     else:
         st.error("Unable to generate custom shape with the given dimensions.")
         return None
 
-# Function to generate a box STL
-def generate_stl_box(dimensions):
+# Function to generate a FreeCAD box
+def generate_freecad_box(doc, dimensions):
     length = dimensions["length"]
     width = dimensions["width"]
     height = dimensions["height"]
+    box = doc.addObject("Part::Box", "Box")
+    box.Length = length
+    box.Width = width
+    box.Height = height
+    doc.recompute()
+    return box
 
-    # Vertices of a 3D box
-    vertices = np.array([
-        [-length/2, -width/2, -height/2],
-        [ length/2, -width/2, -height/2],
-        [ length/2,  width/2, -height/2],
-        [-length/2,  width/2, -height/2],
-        [-length/2, -width/2,  height/2],
-        [ length/2, -width/2,  height/2],
-        [ length/2,  width/2,  height/2],
-        [-length/2,  width/2,  height/2]
-    ])
+# Function to generate a FreeCAD sphere
+def generate_freecad_sphere(doc, dimensions):
+    radius = dimensions["length"] / 2 # Assuming spherical dimension is based on length
+    sphere = doc.addObject("Part::Sphere", "Sphere")
+    sphere.Radius = radius
+    doc.recompute()
+    return sphere
 
-    # Faces of the box (using vertex indices)
-    faces = np.array([
-        [0, 3, 1], [1, 3, 2], # Bottom face
-        [4, 5, 6], [4, 6, 7], # Top face
-        [0, 1, 5], [0, 5, 4], # Front face
-        [1, 2, 6], [1, 6, 5], # Right face
-        [2, 3, 7], [2, 7, 6], # Back face
-        [3, 0, 4], [3, 4, 7]  # Left face
-    ])
+# Button to generate design based on AI's interpretation
+if st.button("Generate CAD Design"):
+    if prompt:
+        # Step 1: Use Gemini AI to process the user's description
+        design_details = process_user_input(prompt)
+        if design_details:
+            st.write("AI interpreted the design as: ", design_details)
 
-    # Create the mesh
-    box_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            box_mesh.vectors[i][j] = vertices[face[j], :]
+            # Step 2: Extract the design dimensions from the AI's response
+            dimensions = extract_dimensions(design_details)
 
-    return box_mesh
+            # Step 3: Generate the CAD design using FreeCAD
+            shape = generate_freecad_shape(dimensions, shape_type)
 
-# Function to generate a sphere STL
-def generate_stl_sphere(dimensions):
-    radius = dimensions["length"] / 2  # Assuming spherical dimension is based on length
-    num_points = grid_resolution  # Resolution of the sphere
+            # Step 4: Export the design as a FreeCAD file
+            if shape:
+                filename = f"{random_string(8)}_design.FCStd"
+                doc.saveAs(filename)
 
-    # Create the sphere using parametric equations
-    vertices = []
-    faces = []
-
-    for i in range(num_points):
-        lat = np.pi * (i / (num_points - 1) - 0.5)
-        for j in range(num_points):
-            lon = 2 * np.pi * j / (num_points - 1)
-            x = radius * np.cos(lat) * np.cos(lon)
-            y = radius * np.cos(lat) * np.sin(lon)
-            z = radius * np.sin(lat)
-            vertices.append([x, y, z])
-
-    # Create faces (triangles between adjacent vertices)
-    for i in range(num_points - 1):
-        for j in range(num_points - 1):
-            p1 =
+                # Provide a download link for the FreeCAD file
+                with open(filename, "rb") as file:
+                    st.download_button(
+                        label="Download FreeCAD File",
+                        data=file,
+                        file_name=filename,
+                        mime="application/octet-stream"
+                    )
+    else:
+        st.write("Please provide a description for the design.")
