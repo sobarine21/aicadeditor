@@ -31,8 +31,11 @@ def process_user_input(user_input):
 def extract_details_from_response(response):
     details = {"shape": None, "length": 0, "width": 0, "height": 0, "unit": "mm"}
 
+    # Print the raw AI response for debugging purposes
+    st.write("AI Response: ", response)
+
     # Regular expressions for identifying shapes and extracting dimensions
-    shape_match = re.search(r'(box|sphere|cylinder|cone|pyramid|car|toy car)', response, re.IGNORECASE)
+    shape_match = re.search(r'(box|sphere|cylinder|cone|pyramid|car|toy car|cube|rectangular|ball|block)', response, re.IGNORECASE)
     dimensions_match = re.findall(r'(\d+\.?\d*)\s*(mm|cm|m|in|ft|yd)?', response)
 
     if shape_match:
