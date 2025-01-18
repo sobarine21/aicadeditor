@@ -214,4 +214,11 @@ def generate_stl_sphere(dimensions):
 
     return sphere_mesh
 
+# Function to provide download option for STL file
+def stl_download_link(stl_mesh, filename="generated_design.stl"):
+    byte_io = BytesIO()
+    stl_mesh.save(byte_io)
+    byte_io.seek(0)
+    st.download_button(label="Download STL", data=byte_io, file_name=filename, mime="application/vnd.ms-pki.stl")
+
 # More shape generation functions (cone, pyramid, cylinder, etc.) need to be implemented similarly.
