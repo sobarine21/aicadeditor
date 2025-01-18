@@ -136,7 +136,7 @@ def stl_to_bytes(stl_mesh):
     byte_io = BytesIO()
     stl_mesh.save(byte_io)
     byte_io.seek(0)
-    return byte_io
+    return byte_io.getvalue()
 
 # Function to generate a cylinder STL
 def generate_stl_cylinder(dimensions):
