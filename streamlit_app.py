@@ -131,53 +131,12 @@ def generate_stl_shape(dimensions, shape_type):
     elif shape_type == "custom":
         return generate_custom_shape(dimensions)
 
-# Function to generate a cylinder STL
-def generate_stl_cylinder(dimensions):
-    radius = dimensions["length"] / 2
-    height = dimensions["height"]
-    num_points = grid_resolution
-
-    vertices = []
-    faces = []
-
-    # Generate vertices for the cylinder
-    for i in range(num_points):
-        angle = 2 * np.pi * i / num_points
-        x = radius * np.cos(angle)
-        y = radius * np.sin(angle)
-        z_top = height / 2
-        z_bottom = -height / 2
-        vertices.append([x, y, z_top])  # Top circle
-        vertices.append([x, y, z_bottom])  # Bottom circle
-
-    # Generate faces for the cylinder
-    for i in range(num_points - 1):
-        # Sides of the cylinder
-        top1 = i * 2
-        top2 = (i + 1) * 2
-        bottom1 = top1 + 1
-        bottom2 = top2 + 1
-        faces.append([top1, bottom1, top2])
-        faces.append([top2, bottom1, bottom2])
-
-    # Cap faces for top and bottom circles
-    for i in range(num_points - 2):
-        # Top cap
-        faces.append([i * 2, ((i + 1) % num_points) * 2, num_points * 2])
-        # Bottom cap
-        faces.append([i * 2 + 1, num_points * 2 + 1, ((i + 1) % num_points) * 2 + 1])
-
-    # Add center vertices for caps
-    vertices.append([0, 0, height / 2])  # Top center
-    vertices.append([0, 0, -height / 2])  # Bottom center
-
-    # Create the mesh
-    cylinder_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            cylinder_mesh.vectors[i][j] = vertices[face[j]]
-
-    return cylinder_mesh
+# Function to convert STL mesh to downloadable format
+def stl_to_bytes(stl_mesh):
+    byte_io = BytesIO()
+    stl_mesh.save(byte_io)
+    byte_io.seek(0)
+    return byte_io
 
 # Function to generate a box STL
 def generate_stl_box(dimensions):
@@ -245,71 +204,13 @@ def generate_stl_sphere(dimensions):
 
     return sphere_mesh
 
-# Function to simulate basic fluid dynamics (drag coefficient)
-def simulate_fluid_dynamics(shape_type, dimensions, material):
-    drag_coefficients = {
-        'sphere': 0.47,
-        'box': 1.0,
-        'cylinder': 0.82,
-    }
-    material_drag_factors = {
-        "Plastic": 1.0,
-        "Metal": 0.9,
-        "Wood": 1.1,
-        "Glass": 0.8,
-        "Rubber": 1.2,
-        "Concrete": 1.3,
-        "Carbon Fiber": 0.7,
-        "Aluminum": 0.85,
-        "Copper": 0.95,
-        "Stone": 1.4
-    }
-
-    drag_coefficient = drag_coefficients.get(shape_type, 1.0)
-    material_factor = material_drag_factors.get(material, 1.0)
-    fluid_flow_behavior = "Smooth" if drag_coefficient < 1.0 else "Turbulent"
-    drag_coefficient *= material_factor
-
-    return drag_coefficient, fluid_flow_behavior
-
-# Function to simulate basic stress testing (simplified)
-def simulate_stress_test(shape_type, dimensions, material):
-    material_strength = {
-        "Plastic": 50,
-        "Metal": 200,
-        "Wood": 30,
-        "Glass": 150,
-        "Rubber": 10,
-        "Concrete": 30,
-        "Carbon Fiber": 1000,
-        "Aluminum": 250,
-        "Copper": 210,
-        "Stone": 80
-    }
-
-    volume = dimensions["length"] * dimensions["width"] * dimensions["height"]
-    material_strength_factor = material_strength.get(material, 50)
-    stress = volume / material_strength_factor
-    stress_level = "Low" if stress < 10 else "Medium" if stress < 50 else "High"
-
-    return stress, stress_level
-
-# Add fluid dynamics and stress tests to the app
-def display_simulation_results(shape_type, dimensions, material):
-    drag_coefficient, fluid_flow_behavior = simulate_fluid_dynamics(shape_type, dimensions, material)
-    st.write(f"**Drag Coefficient**: {drag_coefficient:.2f}")
-    st.write(f"**Fluid Flow Behavior**: {fluid_flow_behavior}")
-
-    stress, stress_level = simulate_stress_test(shape_type, dimensions, material)
-    st.write(f"**Stress Resistance**: {stress:.2f} MPa")
-    st.write(f"**Stress Level**: {stress_level}")
-
-# Main functionality to display results
+# Main functionality to display results and download
 if prompt:
     dimensions = extract_dimensions_nlp(prompt)  # Extract dimensions based on the prompt
     st.write(f"Generated dimensions: {dimensions}")
     shape_mesh = generate_stl_shape(dimensions, shape_type)
     st.write(f"STL file generated for {shape_type}.")
 
-    # Display fluid dynamics and stress test results
-    display_simulation_results(shape_type, dimensions, material)
+    # Convert mesh to bytes for download
+    stl_file = stl_to_bytes(shape_mesh)
+    st.download_button("Download STL", stl_file, file_name=f"{shape_type}_{random_string()}.stl", mime="application/stl")
