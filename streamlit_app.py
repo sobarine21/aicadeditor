@@ -34,6 +34,13 @@ def process_user_input(user_input):
         st.error(f"Error processing input: {e}")
         return None
 
+# Function to safely convert to float
+def safe_float(value):
+    try:
+        return float(value) if value and value != "." else 0
+    except ValueError:
+        return 0
+
 # Function to extract design type and parameters dynamically
 def parse_design_details(response):
     design_details = {
@@ -46,36 +53,36 @@ def parse_design_details(response):
         design_details["type"] = "box"
         matches = re.findall(r"length\s*([\d.]+)|width\s*([\d.]+)|height\s*([\d.]+)", response, re.IGNORECASE)
         if matches:
-            design_details["parameters"]["length"] = float(matches[0][0] or 0)
-            design_details["parameters"]["width"] = float(matches[1][1] or 0)
-            design_details["parameters"]["height"] = float(matches[2][2] or 0)
+            design_details["parameters"]["length"] = safe_float(matches[0][0])
+            design_details["parameters"]["width"] = safe_float(matches[1][1])
+            design_details["parameters"]["height"] = safe_float(matches[2][2])
 
     elif "cylinder" in response.lower():
         design_details["type"] = "cylinder"
         matches = re.findall(r"radius\s*([\d.]+)|height\s*([\d.]+)", response, re.IGNORECASE)
         if matches:
-            design_details["parameters"]["radius"] = float(matches[0][0] or 0)
-            design_details["parameters"]["height"] = float(matches[1][1] or 0)
+            design_details["parameters"]["radius"] = safe_float(matches[0][0])
+            design_details["parameters"]["height"] = safe_float(matches[1][1])
 
     elif "sphere" in response.lower():
         design_details["type"] = "sphere"
         matches = re.findall(r"radius\s*([\d.]+)", response, re.IGNORECASE)
         if matches:
-            design_details["parameters"]["radius"] = float(matches[0][0] or 0)
+            design_details["parameters"]["radius"] = safe_float(matches[0][0])
 
     elif "cone" in response.lower():
         design_details["type"] = "cone"
         matches = re.findall(r"radius\s*([\d.]+)|height\s*([\d.]+)", response, re.IGNORECASE)
         if matches:
-            design_details["parameters"]["radius"] = float(matches[0][0] or 0)
-            design_details["parameters"]["height"] = float(matches[1][1] or 0)
+            design_details["parameters"]["radius"] = safe_float(matches[0][0])
+            design_details["parameters"]["height"] = safe_float(matches[1][1])
 
     elif "pyramid" in response.lower():
         design_details["type"] = "pyramid"
         matches = re.findall(r"base\s*([\d.]+)|height\s*([\d.]+)", response, re.IGNORECASE)
         if matches:
-            design_details["parameters"]["base"] = float(matches[0][0] or 0)
-            design_details["parameters"]["height"] = float(matches[1][1] or 0)
+            design_details["parameters"]["base"] = safe_float(matches[0][0])
+            design_details["parameters"]["height"] = safe_float(matches[1][1])
 
     return design_details
 
