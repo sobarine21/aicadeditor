@@ -14,9 +14,6 @@ except ImportError:
     st.warning("spaCy library not found. Using simpler dimension extraction.")
     nlp = None
 
-# Configure Streamlit secrets (replace with your actual API key)
-st.secrets["GOOGLE_API_KEY"] = "YOUR_API_KEY"
-
 # Streamlit App UI
 st.title("AI CAD Design Generator")
 st.write("Use generative AI to create CAD designs from your description.")
@@ -183,4 +180,19 @@ def generate_stl_sphere(dimensions):
     # Create faces (triangles between adjacent vertices)
     for i in range(num_points - 1):
         for j in range(num_points - 1):
-            p1 =
+            p1 = i * num_points + j
+            p2 = p1 + 1
+            p3 = p1 + num_points
+            p4 = p3 + 1
+            faces.append([p1, p2, p3])
+            faces.append([p2, p4, p3])
+
+    # Create the mesh
+    sphere_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            sphere_mesh.vectors[i][j] = vertices[face[j]]
+
+    return sphere_mesh
+
+# More shape generation functions (cone, pyramid, cylinder, etc.) need to be implemented similarly.
