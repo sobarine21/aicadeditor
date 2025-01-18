@@ -18,7 +18,7 @@ prompt = st.text_area("Describe the design you want (e.g., 'Create a box with le
 def process_user_input(user_input):
     try:
         # Load and configure the Gemini model
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash-exp")
         
         # Generate a response from the AI
         response = model.generate_content(user_input)
