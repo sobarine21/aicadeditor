@@ -5,6 +5,7 @@ import re
 import random
 import string
 from io import BytesIO
+import genai
 
 # NLP library for improved dimension extraction (optional)
 try:
