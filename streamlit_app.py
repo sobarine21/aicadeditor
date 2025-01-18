@@ -36,7 +36,7 @@ def random_string(length=8):
 def process_user_input(user_input):
     try:
         # Load and configure the Gemini model
-        model = genai.GenerativeModel("gemini-1.5-flash-exp")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         
         # Generate a response from the AI
         response = model.generate_content(user_input)
