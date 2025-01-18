@@ -27,24 +27,26 @@ def process_user_input(user_input):
         st.error(f"Error processing input: {e}")
         return None
 
-# Function to extract details from the AI's response (e.g., shape, dimensions, etc.)
-def extract_shape_details(response):
-    # Example of extracting shape and dimensions (you can extend this further)
-    details = {"shape": "", "length": 0, "width": 0, "height": 0, "unit": "mm"}
+# Function to extract details (shape and dimensions) from the AI's response
+def extract_details_from_response(response):
+    details = {"shape": None, "length": 0, "width": 0, "height": 0, "unit": "mm"}
 
-    # Match possible shape types and dimensions using regex
-    shape_match = re.search(r'(box|sphere|cylinder|car|toy car|cone)', response, re.IGNORECASE)
+    # Regular expressions for identifying shapes and extracting dimensions
+    shape_match = re.search(r'(box|sphere|cylinder|cone|pyramid|car|toy car)', response, re.IGNORECASE)
+    dimensions_match = re.findall(r'(\d+\.?\d*)\s*(mm|cm|m|in|ft|yd)?', response)
+
     if shape_match:
         details["shape"] = shape_match.group(0).lower()
-    
-    # Match dimensions (length, width, height)
-    dimensions_match = re.findall(r'(\d+\.?\d*)\s*(mm|cm|m|in|ft|yd)?', response)
-    if len(dimensions_match) >= 3:
-        details["length"] = float(dimensions_match[0][0])
-        details["width"] = float(dimensions_match[1][0])
-        details["height"] = float(dimensions_match[2][0])
-        details["unit"] = dimensions_match[0][1] or "mm"
-    
+
+    if dimensions_match:
+        # Extract dimensions and units (if provided)
+        for dim in dimensions_match:
+            details["length"] = float(dim[0])
+            details["unit"] = dim[1] if dim[1] else "mm"  # Default to mm if no unit provided
+            # For simplicity, assuming length=width=height if only one dimension is given
+            details["width"] = details["length"]
+            details["height"] = details["length"]
+
     return details
 
 # Function to convert units to millimeters
@@ -118,6 +120,30 @@ def generate_stl_sphere(radius):
 
     return sphere_mesh
 
+# Function to generate a cylinder STL
+def generate_stl_cylinder(radius, height):
+    # A simple cylindrical mesh (using a basic parametric equation for a cylinder)
+    theta = np.linspace(0, 2 * np.pi, 30)
+    z = np.linspace(-height / 2, height / 2, 10)
+    theta, z = np.meshgrid(theta, z)
+
+    x = radius * np.cos(theta)
+    y = radius * np.sin(theta)
+
+    # Create faces for the cylinder
+    faces = []
+    for i in range(len(z) - 1):
+        for j in range(len(theta) - 1):
+            faces.append([i * len(theta) + j, (i+1) * len(theta) + j, i * len(theta) + (j+1)])
+            faces.append([(i+1) * len(theta) + j, (i+1) * len(theta) + (j+1), i * len(theta) + (j+1)])
+
+    cylinder_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            cylinder_mesh.vectors[i][j] = [x[face[j]], y[face[j]], z[face[j]]]
+
+    return cylinder_mesh
+
 # Button to generate design based on AI's interpretation
 if st.button("Generate CAD Design"):
     if prompt:
@@ -127,7 +153,7 @@ if st.button("Generate CAD Design"):
             st.write("AI interpreted the design as: ", design_details)
 
             # Step 2: Extract the design details from the AI's response (e.g., shape, dimensions)
-            details = extract_shape_details(design_details)
+            details = extract_details_from_response(design_details)
             shape = details["shape"]
 
             # Initialize stl_file to None, in case the shape is not recognized
@@ -145,6 +171,13 @@ if st.button("Generate CAD Design"):
                 sphere_mesh = generate_stl_sphere(radius)
                 stl_file = "sphere_design.stl"
                 sphere_mesh.save(stl_file)
+
+            elif shape == "cylinder":
+                # Step 3: Generate the CAD design (STL file) for a cylinder
+                radius = convert_to_mm(details["length"], details["unit"])  # Assuming radius is provided as "length"
+                cylinder_mesh = generate_stl_cylinder(radius, details["height"])
+                stl_file = "cylinder_design.stl"
+                cylinder_mesh.save(stl_file)
 
             else:
                 st.error("Shape not recognized or supported. Please provide a valid description.")
