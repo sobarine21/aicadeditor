@@ -34,14 +34,14 @@ material = st.selectbox("Choose a material type:", ["Plastic", "Metal", "Wood", 
 smooth_surface = st.checkbox("Smooth Surface?", value=False)
 hollow = st.checkbox("Hollow Structure?", value=False)
 
-# Advanced Features (25 additional)
+# Advanced Features
 texture = st.selectbox("Choose a texture:", ["Matte", "Glossy", "Metallic", "Transparent", "Fabric", "Wooden", "Stone", "Leather", "Grainy", "Smooth"])
 grid_resolution = st.slider("Set Grid Resolution", min_value=10, max_value=100, value=50)
 add_round_edges = st.checkbox("Add rounded edges?", value=False)
 enable_symmetry = st.checkbox("Enable symmetry?", value=False)
 wall_thickness = st.slider("Set wall thickness (for hollow objects)", min_value=1, max_value=10, value=2)
 
-# 25 new additional features
+# Additional Features
 add_stretch = st.checkbox("Apply Stretch/Deformation?", value=False)
 apply_bumps = st.checkbox("Apply Bumps/Reliefs on surface?", value=False)
 add_textures = st.checkbox("Add custom textures?", value=False)
@@ -83,7 +83,6 @@ def extract_dimensions_nlp(response):
         return extract_dimensions_regex(response)
 
     doc = nlp(response)
-
     dimensions = {"length": 0, "width": 0, "height": 0}
     for token in doc:
         if token.pos_ == "NUM":
@@ -112,77 +111,17 @@ def generate_stl_shape(dimensions, shape_type):
     if shape_type == "box":
         return generate_stl_box(dimensions)
     elif shape_type == "sphere":
-        return generate_stl_sphere(dimensions)
+        return generate_stl_sphere(dimensions)  # Implement sphere generation
     elif shape_type == "cone":
         return generate_stl_cone(dimensions)  # Implement cone generation
     elif shape_type == "pyramid":
         return generate_stl_pyramid(dimensions)  # Implement pyramid generation
     elif shape_type == "cylinder":
-        return generate_stl_cylinder(dimensions)  # Implement cylinder generation
+        return generate_stl_cylinder(dimensions)
     elif shape_type == "torus":
         return generate_stl_torus(dimensions)  # Implement torus generation
     elif shape_type == "custom":
         return generate_custom_shape(dimensions)
-
-# Function to convert the mesh to bytes
-def stl_to_bytes(stl_mesh):
-    # Create a temporary file to save the STL mesh
-    with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as temp_file:
-        stl_mesh.save(temp_file.name)  # Save to temporary file
-        
-        # Now, open the temporary file and read the binary content into BytesIO
-        with open(temp_file.name, 'rb') as f:
-            byte_io = BytesIO(f.read())
-    byte_io.seek(0)
-    return byte_io.getvalue()
-
-# Function to generate a cylinder STL
-def generate_stl_cylinder(dimensions):
-    radius = dimensions["length"] / 2
-    height = dimensions["height"]
-    num_points = grid_resolution
-
-    vertices = []
-    faces = []
-
-    # Generate vertices for the cylinder
-    for i in range(num_points):
-        angle = 2 * np.pi * i / num_points
-        x = radius * np.cos(angle)
-        y = radius * np.sin(angle)
-        z_top = height / 2
-        z_bottom = -height / 2
-        vertices.append([x, y, z_top])  # Top circle
-        vertices.append([x, y, z_bottom])  # Bottom circle
-
-    # Generate faces for the cylinder
-    for i in range(num_points - 1):
-        # Sides of the cylinder
-        top1 = i * 2
-        top2 = (i + 1) * 2
-        bottom1 = top1 + 1
-        bottom2 = top2 + 1
-        faces.append([top1, bottom1, top2])
-        faces.append([top2, bottom1, bottom2])
-
-    # Cap faces for top and bottom circles
-    for i in range(num_points - 2):
-        # Top cap
-        faces.append([i * 2, ((i + 1) % num_points) * 2, num_points * 2])
-        # Bottom cap
-        faces.append([i * 2 + 1, num_points * 2 + 1, ((i + 1) % num_points) * 2 + 1])
-
-    # Add center vertices for caps
-    vertices.append([0, 0, height / 2])  # Top center
-    vertices.append([0, 0, -height / 2])  # Bottom center
-
-    # Create the mesh
-    cylinder_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            cylinder_mesh.vectors[i][j] = vertices[face[j]]
-
-    return cylinder_mesh
 
 # Function to generate a box STL
 def generate_stl_box(dimensions):
@@ -191,14 +130,14 @@ def generate_stl_box(dimensions):
     height = dimensions["height"]
 
     vertices = np.array([
-        [-length/2, -width/2, -height/2],
-        [ length/2, -width/2, -height/2],
-        [ length/2,  width/2, -height/2],
-        [-length/2,  width/2, -height/2],
-        [-length/2, -width/2,  height/2],
-        [ length/2, -width/2,  height/2],
-        [ length/2,  width/2,  height/2],
-        [-length/2,  width/2,  height/2]
+        [-length / 2, -width / 2, -height / 2],
+        [length / 2, -width / 2, -height / 2],
+        [length / 2, width / 2, -height / 2],
+        [-length / 2, width / 2, -height / 2],
+        [-length / 2, -width / 2, height / 2],
+        [length / 2, -width / 2, height / 2],
+        [length / 2, width / 2, height / 2],
+        [-length / 2, width / 2, height / 2],
     ])
 
     faces = np.array([
@@ -207,64 +146,32 @@ def generate_stl_box(dimensions):
         [0, 1, 5], [0, 5, 4],
         [1, 2, 6], [1, 6, 5],
         [2, 3, 7], [2, 7, 6],
-        [3, 0, 4], [3, 4, 7]
+        [3, 0, 4], [3, 4, 7],
     ])
 
     box_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
-            box_mesh.vectors[i][j] = vertices[face[j], :]
+            box_mesh.vectors[i][j] = vertices[face[j]]
 
     return box_mesh
 
-# Function to generate a sphere STL
-def generate_stl_sphere(dimensions):
-    radius = dimensions["length"] / 2
-    num_points = grid_resolution
+# Main app logic
+if st.button("Generate Design"):
+    if prompt.strip() == "":
+        st.error("Please provide a description for your design.")
+    else:
+        st.success("Design generated successfully!")
+        response = process_user_input(prompt)
+        dimensions = extract_dimensions_nlp(response)
+        st.write(f"Extracted Dimensions: {dimensions}")
 
-    vertices = []
-    faces = []
+        stl_mesh = generate_stl_shape(dimensions, shape_type)
+        stl_data = stl_to_bytes(stl_mesh)
 
-    for i in range(num_points):
-        lat = np.pi * (i / (num_points - 1) - 0.5)
-        for j in range(num_points):
-            lon = 2 * np.pi * j / (num_points - 1)
-            x = radius * np.cos(lat) * np.cos(lon)
-            y = radius * np.cos(lat) * np.sin(lon)
-            z = radius * np.sin(lat)
-            vertices.append([x, y, z])
-
-    for i in range(num_points - 1):
-        for j in range(num_points - 1):
-            p1 = i * num_points + j
-            p2 = p1 + 1
-            p3 = p1 + num_points
-            p4 = p3 + 1
-            faces.append([p1, p2, p3])
-            faces.append([p2, p4, p3])
-
-    sphere_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            sphere_mesh.vectors[i][j] = vertices[face[j]]
-
-    return sphere_mesh
-
-# Button to generate STL and download
-if st.button("Generate STL"):
-    response = process_user_input(prompt)
-    dimensions = extract_dimensions_nlp(response)
-    
-    # Generate the STL mesh
-    stl_mesh = generate_stl_shape(dimensions, shape_type)
-    
-    # Convert mesh to bytes
-    stl_bytes = stl_to_bytes(stl_mesh)
-
-    # Provide download link
-    st.download_button(
-        label="Download STL File",
-        data=stl_bytes,
-        file_name=f"{random_string()}.stl",
-        mime="application/stl"
-    )
+        st.download_button(
+            label="Download STL File",
+            data=stl_data,
+            file_name=f"{shape_type}_{random_string()}.stl",
+            mime="application/octet-stream",
+        )
