@@ -131,24 +131,7 @@ def generate_stl_shape(dimensions, shape_type):
     elif shape_type == "custom":
         return generate_custom_shape(dimensions)
 
-# Function to generate a custom shape (based on AI's interpretation)
-def generate_custom_shape(dimensions):
-    length = dimensions["length"]
-    width = dimensions["width"]
-    height = dimensions["height"]
-
-    # Example of a simple custom shape - a randomly created combination of predefined shapes or parts
-    # This can be extended as per the prompt description, e.g., a car, a chair, etc.
-    if length > 0 and width > 0 and height > 0:
-        box_mesh = generate_stl_box({"length": length, "width": width, "height": height})
-        sphere_mesh = generate_stl_sphere({"length": height, "width": width, "height": height})
-        # Combine shapes or create new geometry based on AI's response
-        return box_mesh
-    else:
-        st.error("Unable to generate custom shape with the given dimensions.")
-        return None
-
-# Function to generate a box STL
+# Function to generate an STL file for the box shape
 def generate_stl_box(dimensions):
     length = dimensions["length"]
     width = dimensions["width"]
@@ -181,10 +164,10 @@ def generate_stl_box(dimensions):
 
     return box_mesh
 
-# Function to generate a sphere STL
+# Function to generate an STL file for the sphere shape
 def generate_stl_sphere(dimensions):
     radius = dimensions["length"] / 2
-    num_points = grid_resolution
+    num_points = 50  # Set grid resolution
 
     vertices = []
     faces = []
@@ -214,4 +197,18 @@ def generate_stl_sphere(dimensions):
 
     return sphere_mesh
 
-# More shape generation functions (cone, pyramid, cylinder, etc.) need to be implemented similarly.
+# Function to download the STL file
+def download_stl(mesh):
+    stl_file = BytesIO()
+    mesh.save(stl_file)
+    stl_file.seek(0)
+    st.download_button("Download STL file", stl_file, file_name="generated_design.stl", mime="application/stl")
+
+# Trigger generation and download
+if st.button("Generate Design"):
+    # Process the prompt to extract dimensions and shape
+    dimensions = extract_dimensions_regex(prompt)  # Assuming dimensions extracted from prompt
+    stl_mesh = generate_stl_shape(dimensions, shape_type)
+    
+    if stl_mesh:
+        download_stl(stl_mesh)  # Allow the user to download the STL file
