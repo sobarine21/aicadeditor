@@ -27,23 +27,38 @@ def process_user_input(user_input):
         st.error(f"Error processing input: {e}")
         return None
 
-# Function to extract dimensions from the AI's response
-def extract_dimensions(response):
-    dimensions = {"length": 0, "width": 0, "height": 0}
-    # Regex to extract numerical dimensions (assuming a format like: length x width x height)
-    numbers = re.findall(r'\d+', response)
-    if len(numbers) >= 3:
-        dimensions["length"] = float(numbers[0])
-        dimensions["width"] = float(numbers[1])
-        dimensions["height"] = float(numbers[2])
+# Function to extract dimensions and possible units from the AI's response
+def extract_dimensions_and_units(response):
+    dimensions = {"length": 0, "width": 0, "height": 0, "unit": "mm"}
+    # Regex to extract numerical dimensions and units (length x width x height with optional units)
+    matches = re.findall(r'(\d+\.?\d*)\s*(mm|cm|m|in|ft|yd)?', response)
+    if len(matches) >= 3:
+        dimensions["length"] = float(matches[0][0])
+        dimensions["width"] = float(matches[1][0])
+        dimensions["height"] = float(matches[2][0])
+        # Use the most common unit or default to 'mm'
+        dimensions["unit"] = matches[0][1] or "mm"
     return dimensions
+
+# Function to convert units to millimeters
+def convert_to_mm(value, unit):
+    if unit == "cm":
+        return value * 10
+    elif unit == "m":
+        return value * 1000
+    elif unit == "in":
+        return value * 25.4
+    elif unit == "ft":
+        return value * 304.8
+    elif unit == "yd":
+        return value * 914.4
+    return value  # default to mm if the unit is already mm
 
 # Function to generate an STL file for a box
 def generate_stl_box(dimensions):
-    # Create a 3D box (vertices)
-    length = dimensions["length"]
-    width = dimensions["width"]
-    height = dimensions["height"]
+    length = convert_to_mm(dimensions["length"], dimensions["unit"])
+    width = convert_to_mm(dimensions["width"], dimensions["unit"])
+    height = convert_to_mm(dimensions["height"], dimensions["unit"])
 
     # Vertices of a 3D box
     vertices = np.array([
@@ -83,8 +98,8 @@ if st.button("Generate CAD Design"):
         if design_details:
             st.write("AI interpreted the design as: ", design_details)
 
-            # Step 2: Extract the design dimensions from the AI's response
-            dimensions = extract_dimensions(design_details)
+            # Step 2: Extract the design dimensions and unit from the AI's response
+            dimensions = extract_dimensions_and_units(design_details)
 
             # Step 3: Generate the CAD design (STL file) using numpy-stl
             box_mesh = generate_stl_box(dimensions)
