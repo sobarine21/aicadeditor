@@ -1,11 +1,10 @@
 import streamlit as st
 import numpy as np
-from stl import mesh
-import re
 import random
 import string
 from io import BytesIO
-import genai
+from stl.mesh import Mesh  # Correct import for Mesh class from numpy-stl
+import re
 
 # NLP library for improved dimension extraction (optional)
 try:
@@ -72,18 +71,10 @@ add_extrusion = st.checkbox("Apply extrusion to the shape?", value=False)
 def random_string(length=8):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
-# Function to process user input with Gemini AI
+# Function to process user input with Gemini AI (placeholder for AI functionality)
 def process_user_input(user_input):
-    try:
-        # Load and configure the Gemini model
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
-
-        # Generate a response from the AI
-        response = model.generate_content(user_input)
-        return response.text
-    except Exception as e:
-        st.error(f"Error processing input: {e}")
-        return None
+    # In a real application, you'd integrate a model like Gemini to process the input
+    return user_input
 
 # Function to extract dimensions from the AI's response (using NLP - optional)
 def extract_dimensions_nlp(response):
@@ -180,7 +171,7 @@ def generate_stl_cylinder(dimensions):
     vertices.append([0, 0, -height / 2])  # Bottom center
 
     # Create the mesh
-    cylinder_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+    cylinder_mesh = Mesh(np.zeros(len(faces), dtype=Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
             cylinder_mesh.vectors[i][j] = vertices[face[j]]
@@ -213,7 +204,7 @@ def generate_stl_box(dimensions):
         [3, 0, 4], [3, 4, 7]
     ])
 
-    box_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+    box_mesh = Mesh(np.zeros(faces.shape[0], dtype=Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
             box_mesh.vectors[i][j] = vertices[face[j], :]
@@ -246,27 +237,28 @@ def generate_stl_sphere(dimensions):
             faces.append([p1, p2, p3])
             faces.append([p2, p4, p3])
 
-    sphere_mesh = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
+    sphere_mesh = Mesh(np.zeros(len(faces), dtype=Mesh.dtype))
     for i, face in enumerate(faces):
         for j in range(3):
             sphere_mesh.vectors[i][j] = vertices[face[j]]
 
     return sphere_mesh
 
-# Main functionality to display results
-if prompt:
-    dimensions = extract_dimensions_nlp(prompt)  # Extract dimensions based on the prompt
-    st.write(f"Generated dimensions: {dimensions}")
-    shape_mesh = generate_stl_shape(dimensions, shape_type)
-    st.write(f"STL file generated for {shape_type}.")
+# Button to generate STL and download
+if st.button("Generate STL"):
+    response = process_user_input(prompt)
+    dimensions = extract_dimensions_nlp(response)
+    
+    # Generate the STL mesh
+    stl_mesh = generate_stl_shape(dimensions, shape_type)
+    
+    # Convert mesh to bytes
+    stl_bytes = stl_to_bytes(stl_mesh)
 
-    # Create BytesIO stream for download
-    stl_bytes = stl_to_bytes(shape_mesh)
-
-    # Allow the user to download the STL file
+    # Provide download link
     st.download_button(
-        label="Download STL file",
+        label="Download STL File",
         data=stl_bytes,
-        file_name=f"{shape_type}_{random_string()}.stl",
-        mime="application/vnd.ms-pki.stl"
+        file_name=f"{random_string()}.stl",
+        mime="application/stl"
     )
