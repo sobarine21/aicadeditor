@@ -1,12 +1,10 @@
 import streamlit as st
-import openai
+import google.generativeai as genai
 import trimesh
-import numpy as np
 import plotly.graph_objects as go
-from google.generativeai import genai
+import numpy as np
 
-# Configure API keys for AI models
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# Configure the Gemini API key securely from Streamlit's secrets
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
 # Streamlit app UI
@@ -16,11 +14,12 @@ st.write("Transform your plain text descriptions into parametric 3D models.")
 # User input for CAD model description
 prompt = st.text_area("Enter your 3D model description (e.g., 'a box with a hole in the center'):")
 
-# Function to generate 3D model from text description using OpenAI or Google AI
+# Function to generate 3D model from text description using Google Gemini
 def generate_3d_model(prompt):
-    # Use a simple AI model (OpenAI's GPT or Google's Gemini) to interpret the prompt and return model parameters
     try:
-        response = genai.GenerativeModel('gemini-1.5-flash').generate_content(prompt)
+        # Using Gemini to interpret the prompt and return model parameters
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
         model_description = response.text
         st.write("AI Response:", model_description)
         return model_description
@@ -28,10 +27,9 @@ def generate_3d_model(prompt):
         st.error(f"Error generating model: {e}")
         return None
 
-# Function to create a simple 3D model based on AI description (using trimesh)
+# Function to create a 3D model based on AI description using Trimesh
 def create_3d_model_from_description(description):
-    # Example: Simple logic for parsing description and generating a 3D object.
-    # Here we can interpret different shapes (like box, cylinder) and create 3D models.
+    # Example: Simple logic for parsing description and generating a 3D object
     if "box" in description:
         # Create a box model
         box = trimesh.primitives.Box(extents=[2, 2, 2])
@@ -51,10 +49,10 @@ def create_3d_model_from_description(description):
 # Button to generate 3D model
 if st.button("Generate 3D Model"):
     if prompt:
-        # Generate the model description via AI
+        # Generate the model description via Gemini
         model_description = generate_3d_model(prompt)
         
-        # If a description is generated, proceed to create 3D model
+        # If a description is generated, proceed to create the 3D model
         if model_description:
             # Generate 3D model from description
             model = create_3d_model_from_description(model_description)
