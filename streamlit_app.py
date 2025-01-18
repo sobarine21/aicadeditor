@@ -1,7 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import numpy as np
-import FreeCAD, Part
+import freecad, Part
 import re
 import random
 import string
