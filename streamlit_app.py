@@ -1,102 +1,75 @@
 import streamlit as st
 import google.generativeai as genai
 import trimesh
-import plotly.graph_objects as go
-import re
+import numpy as np
+import tempfile
+from trimesh.exchange.gltf import export_glb
 
-# Set up Gemini API key securely from Streamlit secrets
+# Configure the API key securely from Streamlit's secrets
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-# Streamlit app UI
-st.title("AI-Powered CAD Tool")
-st.write("Create 3D models from text descriptions.")
+# Streamlit App UI
+st.title("3D Mesh Generation and Visualization with Gemini AI")
+st.write("Generate 3D meshes based on your prompt using Google's Gemini AI model.")
 
-# User input for CAD model description
-prompt = st.text_area("Describe your 3D model (e.g., 'Create a toy car with length 100mm, width 50mm, height 30mm'):")
+# Prompt input field
+prompt = st.text_input("Enter your prompt:", "Create a 3D model of a table.")
 
-# Function to generate 3D model description via Gemini API
-def generate_model_description(prompt):
+# Button to generate response
+if st.button("Generate Mesh"):
     try:
-        # Requesting model description from Gemini
+        # Load and configure the model
         model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Generate response from the model (e.g., OBJ format for a 3D model)
         response = model.generate_content(prompt)
-        model_description = response.text
-        st.write("AI Response:", model_description)
-        return model_description
+        mesh_text = response.text
+
+        # Display the generated mesh (assumed to be in OBJ format)
+        st.write("Generated 3D Mesh (OBJ format):")
+        st.text_area("Generated OBJ Data", mesh_text)
+
+        # Button to visualize the 3D mesh
+        if st.button("Visualize 3D Mesh"):
+            # Apply gradient color to the mesh (based on Y-axis values)
+            glb_path = apply_gradient_color(mesh_text)
+            st.write("3D Mesh with Gradient Coloring:")
+
+            # Display the 3D mesh visualization in Streamlit
+            st.write(f"Download the GLB file: [Download GLB]({glb_path})")
+
+            # If you prefer, use pydeck or other visual tools to show the 3D model directly.
+            # st.pydeck_chart(presentation of the model here if compatible)
+
     except Exception as e:
-        st.error(f"Error generating model: {e}")
-        return None
+        st.error(f"Error: {e}")
 
-# Function to extract parameters (dimensions and wheel sizes) from the description
-def extract_parameters(description):
-    # Using regular expressions to extract dimensions
-    car_dimensions = re.findall(r'length\s?(\d+\.?\d*)\s?mm.*?width\s?(\d+\.?\d*)\s?mm.*?height\s?(\d+\.?\d*)\s?mm', description)
-    wheel_radius = re.findall(r'wheel\s?radius\s?(\d+\.?\d*)\s?mm', description)
-    
-    # If parameters are found, return them
-    if car_dimensions:
-        length, width, height = map(float, car_dimensions[0])
-        wheel_radius = float(wheel_radius[0]) if wheel_radius else 5  # Default if not specified
-        return {"shape": "toy_car", "body_dimensions": [length, width, height], "wheel_radius": wheel_radius}
-    
-    # Default values if no valid input is found
-    return {"shape": "toy_car", "body_dimensions": [100, 50, 30], "wheel_radius": 5}
+# Function to apply gradient coloring to the mesh based on Y-axis values
+def apply_gradient_color(mesh_text):
+    temp_file = tempfile.NamedTemporaryFile(suffix=".obj", delete=False).name
+    with open(temp_file, "w") as f:
+        f.write(mesh_text)
 
-# Function to create a 3D model of the toy car using Trimesh
-def create_3d_model_from_description(description):
-    params = extract_parameters(description)
-    
-    # Create the car body as a box (simple 3D shape)
-    body = trimesh.primitives.Box(extents=params["body_dimensions"])
-    
-    # Create the wheels as cylinders (default 4 wheels if not specified)
-    wheel_radius = params["wheel_radius"]
-    wheel_height = 5  # Fixed wheel height
-    wheels = []
-    for i in range(4):
-        offset_x = params["body_dimensions"][0] / 2 if i % 2 == 0 else -params["body_dimensions"][0] / 2
-        offset_y = params["body_dimensions"][1] / 2 if i < 2 else -params["body_dimensions"][1] / 2
-        wheel = trimesh.primitives.Cylinder(radius=wheel_radius, height=wheel_height)
-        wheel.apply_translation([offset_x, offset_y, -params["body_dimensions"][2] / 2])
-        wheels.append(wheel)
-    
-    # Combine body and wheels into one mesh
-    all_parts = [body] + wheels
-    car_model = trimesh.util.concatenate(all_parts)
-    return car_model
+    # Load the mesh
+    mesh = trimesh.load_mesh(temp_file)
 
-# Function to visualize 3D model using Plotly
-def visualize_3d_model(model):
-    # Convert Trimesh model to vertices and faces for Plotly visualization
-    vertices = model.vertices
-    faces = model.faces
-    fig = go.Figure(data=[go.Mesh3d(
-        x=vertices[:, 0], y=vertices[:, 1], z=vertices[:, 2],
-        i=faces[:, 0], j=faces[:, 1], k=faces[:, 2],
-        opacity=0.7,
-        color='blue'
-    )])
-    fig.update_layout(
-        title="Generated 3D Model",
-        scene=dict(
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=False),
-            zaxis=dict(showgrid=False)
-        ),
-    )
-    st.plotly_chart(fig)
+    # Apply gradient coloring based on the Y-axis of the vertices
+    vertices = mesh.vertices
+    y_values = vertices[:, 1]  # Y-axis values
+    y_normalized = (y_values - y_values.min()) / (y_values.max() - y_values.min())
 
-# Button to generate the model
-if st.button("Generate 3D Model"):
-    if prompt:
-        # Step 1: Use Gemini AI to generate a description
-        model_description = generate_model_description(prompt)
-        
-        # Step 2: Generate the 3D model from the description
-        if model_description:
-            model = create_3d_model_from_description(model_description)
-            # Step 3: Visualize the generated model
-            if model:
-                visualize_3d_model(model)
-    else:
-        st.error("Please enter a description for the 3D model.")
+    # Create colors from the normalized Y-values (gradient from blue to red)
+    colors = np.zeros((len(vertices), 4))  # RGBA
+    colors[:, 0] = y_normalized  # Red channel
+    colors[:, 2] = 1 - y_normalized  # Blue channel
+    colors[:, 3] = 1.0  # Alpha channel
+
+    # Attach colors to mesh vertices
+    mesh.visual.vertex_colors = colors
+
+    # Save the mesh as GLB
+    glb_path = temp_file + ".glb"
+    with open(glb_path, "wb") as f:
+        f.write(export_glb(mesh))
+
+    return glb_path
