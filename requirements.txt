@@ -1,6 +1,9 @@
 streamlit 
 google-generativeai 
-numpy-stl
+numpy
 PyOpenGL
 trimesh
 plotly
+pydeck
+Pillow
+pygltflib
