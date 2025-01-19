@@ -7,3 +7,4 @@ plotly
 pydeck
 Pillow
 pygltflib
+stl
